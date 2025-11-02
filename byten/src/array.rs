@@ -1,21 +1,14 @@
 use crate::{DecodeError, Decoder, EncodeError, Encoder, FixedMeasurer, Measurer};
 
-pub struct Array<Item, const N: usize>(pub Item);
+pub struct ArrayCodec<Item, const N: usize>(pub Item);
 
-impl<Item, const N: usize> Array<Item, N> {
-    pub fn codec(item: Item) -> Self {
+impl<Item, const N: usize> ArrayCodec<Item, N> {
+    pub const fn new(item: Item) -> Self {
         Self(item)
     }
 }
 
-impl<Item, const N: usize> Default for Array<Item, N>
-where
-    Item: Default,
-{
-    fn default() -> Self { Self::codec(Item::default()) }
-}
-
-impl<'encoded, 'decoded, Item, const N: usize> Decoder<'encoded, 'decoded> for Array<Item, N>
+impl<'encoded, 'decoded, Item, const N: usize> Decoder<'encoded, 'decoded> for ArrayCodec<Item, N>
 where
     Item: Decoder<'encoded, 'decoded>,
 {
@@ -32,7 +25,7 @@ where
     }
 }
 
-impl<Item, const N: usize> Encoder for Array<Item, N>
+impl<Item, const N: usize> Encoder for ArrayCodec<Item, N>
 where
     Item: Encoder,
     Item::Decoded: Sized,
@@ -47,7 +40,7 @@ where
     }
 }
 
-impl<Item, const N: usize> FixedMeasurer for Array<Item, N>
+impl<Item, const N: usize> FixedMeasurer for ArrayCodec<Item, N>
 where
     Item: FixedMeasurer,
     Item::Decoded: Sized,
@@ -57,7 +50,7 @@ where
     }
 }
 
-impl<Item, const N: usize> Measurer for Array<Item, N>
+impl<Item, const N: usize> Measurer for ArrayCodec<Item, N>
 where
     Item: Measurer,
     Item::Decoded: Sized,

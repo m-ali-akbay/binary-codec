@@ -1,24 +1,26 @@
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 
-use byten::{Decode, DecodeOwned, Encode, Measure, SelfCodec, prelude::EncodeToVec as _, prim, util::{self, Convert}, var};
+use byten::{Decode, DecodeOwned, DefaultCodec, Encode, Measure, EncodeToVec as _};
 
-type U16BEAsUSize = Convert<prim::U16BE, usize>;
-
-#[derive(Debug, Encode, Measure, DecodeOwned)]
+#[derive(Debug, DefaultCodec, Encode, Measure, DecodeOwned)]
 pub struct Directory {
+    #[byten(CStr $own)]
     pub name: CString,
-    #[byten(var::Vec::<U16BEAsUSize, SelfCodec<_>>::default())]
+    #[byten($vec(Box<Entry>)[u16 $be])]
     pub entries: Vec<Box<Entry>>,
 }
 
-#[derive(Debug, Encode, Measure, DecodeOwned)]
+#[derive(Debug, DefaultCodec, Encode, Measure, DecodeOwned)]
 pub struct File {
+    #[byten(CStr $own)]
     pub name: CString,
-    #[byten(util::Owned::<var::Slice<U16BEAsUSize>, Vec<u8>>::default())]
+    #[byten($bytes[u16 $be] $own)]
     pub content: Vec<u8>,
+    #[byten(u32 $be $opt)]
+    pub assigned_application_id: Option<u32>,
 }
 
-#[derive(Debug, Encode, Measure, DecodeOwned)]
+#[derive(Debug, DefaultCodec, Encode, Measure, DecodeOwned)]
 #[repr(u8)]
 pub enum Entry {
     File(File) = 1,
@@ -32,6 +34,7 @@ fn main() {
             Box::new(Entry::File(File {
                 name: CString::new("file1.txt").unwrap(),
                 content: b"Hello, World!".to_vec(),
+                assigned_application_id: Some(42),
             })),
             Box::new(Entry::Directory(Directory {
                 name: CString::new("subdir").unwrap(),
@@ -39,6 +42,7 @@ fn main() {
                     Box::new(Entry::File(File {
                         name: CString::new("file2.txt").unwrap(),
                         content: b"Rust is awesome!".to_vec(),
+                        assigned_application_id: None,
                     })),
                 ],
             })),

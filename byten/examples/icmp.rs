@@ -1,19 +1,18 @@
-use byten::{Encode, Measure, Decode, DecodeOwned, prim::U16BE, util, var};
-use byten::prelude::EncodeToVec as _;
+use byten::{Decode, DecodeOwned, DefaultCodec, Encode, Measure, EncodeToVec as _};
 
-#[derive(Debug, Encode, Measure, DecodeOwned)]
+#[derive(Debug, DefaultCodec, Encode, Measure, DecodeOwned)]
 pub struct IcmpHeader {
     pub icmp_type: u8,
     pub code: u8,
-    #[byten(U16BE)]
+    #[byten($be)]
     pub checksum: u16,
     pub rest_of_header: [u8; 4],
 }
 
-#[derive(Debug, Encode, Measure, DecodeOwned)]
+#[derive(Debug, DefaultCodec, Encode, Measure, DecodeOwned)]
 pub struct IcmpPacket {
     pub header: IcmpHeader,
-    #[byten(util::Owned::<var::Remaining, Vec<u8>>::default())]
+    #[byten(.. $own)]
     pub data: Vec<u8>,
 }
 

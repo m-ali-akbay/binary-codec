@@ -1,49 +1,49 @@
-use byten::{
-    Decode, DecodeOwned, Encode, Measure, MeasureFixed, SelfCodec, prim::{U16BE, U16LE, U32BE, U64BE}, util::Convert, var
-};
+use byten::{ DefaultCodec, DecodeOwned, Encode, Measure, MeasureFixed };
 
-type U8AsUSize = Convert<SelfCodec<u8>,usize>;
-
-#[derive(Debug, DecodeOwned, PartialEq, Eq, Encode, Measure)]
+#[derive(Debug, PartialEq, Eq, DefaultCodec, DecodeOwned, Encode, Measure)]
 struct Person {
-    #[byten(U32BE)]
+    #[byten($be)]
     id: u32,
-    #[byten(var::str::String::<U8AsUSize>::default())]
+    #[byten( $bytes[u8] $utf8 $own )]
     name: String,
     birthday: Date,
-    #[byten(var::Vec::<var::USizeBE, SelfCodec::<Color>>::default())]
+    #[byten( $vec(Color)[usize $uvarbe] )]
     favorite_colors: Vec<Color>,
 }
 
-#[derive(Debug, DecodeOwned, PartialEq, Eq, Encode, MeasureFixed)]
+const fn custom_codec() -> ::byten::EndianCodec<u16> {
+    ::byten::EndianCodec::new(::byten::Endianness::Big)
+}
+
+#[derive(Debug, PartialEq, Eq, DefaultCodec, DecodeOwned, Encode, MeasureFixed)]
 struct Date {
     day: u8,
     month: u8,
-    #[byten(U16BE)]
+    #[byten({ custom_codec() })]
     year: u16,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, DecodeOwned, Encode, Measure)]
+#[derive(Clone, Debug, PartialEq, Eq, DefaultCodec, DecodeOwned, Encode, Measure)]
 #[repr(u16)]
-#[byten(U16LE)]
+#[byten($le)]
 enum Color {
     Red = 1,
     Green = 2,
     Blue = 3,
     Grayscale(
-        #[byten(U16BE)]
+        #[byten($be)]
         u16
     ) = 4,
     RGBa {
         red: u8,
         green: u8,
         blue: u8,
-        #[byten(U16BE)]
+        #[byten($be)]
         alpha: u16,
     } = 5,
     Gradient(Box::<Color>, Box::<Color>) = 6,
     ColorCode(
-        #[byten(U64BE)]
+        #[byten($be)]
         u64
     ) = 7,
     Unknown() = 255,
@@ -51,7 +51,7 @@ enum Color {
 
 #[cfg(test)]
 mod test {
-    use byten::prelude::EncodeToVec;
+    use byten::{Decode as _, EncodeToVec as _};
 
     use super::*;
     

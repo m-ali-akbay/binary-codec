@@ -1,19 +1,30 @@
-use byten::{Decode, Encode, Measure, prelude::EncodeToVec as _, prim, util::Convert, var};
+use std::ffi::CStr;
 
-type U16BEAsUSize = Convert<prim::U16BE, usize>;
+use byten::{Decode, DefaultCodec, Encode, Measure, EncodeToVec as _};
 
-#[derive(Debug, Encode, Decode, Measure)]
+#[derive(Debug, DefaultCodec, Encode, Decode, Measure)]
 pub struct Person<'encoded> {
-    #[byten(var::str::Str::<U16BEAsUSize>::default())]
-    pub first_name: &'encoded str,
-    #[byten(var::str::Str::<U16BEAsUSize>::default())]
-    pub last_name: &'encoded str,
+    pub first_name: &'encoded CStr,
+
+    pub last_name: &'encoded CStr,
+
+    #[byten($bytes[u16 $be] $utf8)]
+    pub address: &'encoded str,
+
+    #[byten($bytes[u32 $uvarbe])]
+    pub avatar_image: &'encoded [u8],
+
+    #[byten(.. $utf8)]
+    pub extra_data: &'encoded str,
 }
 
 fn main() {
     let person = Person {
-        first_name: "Alice",
-        last_name: "Smith",
+        first_name: CStr::from_bytes_with_nul(b"Alice\0").unwrap(),
+        last_name: CStr::from_bytes_with_nul(b"Smith\0").unwrap(),
+        address: "123 Main St, Springfield",
+        avatar_image: &[0, 1, 2, 3, 4, 5],
+        extra_data: &"Some extra information",
     };
 
     let encoded = person.encode_to_vec().unwrap();

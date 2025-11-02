@@ -1,41 +1,29 @@
-use std::{iter, vec::Vec as StdVec, option::Option as StdOption};
+use std::{marker::PhantomData, option::Option as StdOption, vec::Vec as StdVec};
 
-use crate::Encode as _;
-use crate::Decode as _;
-use crate::Measure as _;
+use crate::{BoolCodec, DecodeError, U8Codec};
 
-pub mod str;
-
-pub struct Vec<Length, Item> {
-    pub length: Length,
+pub struct VecCodec<Item, Length> {
     pub item: Item,
+    pub length: Length,
 }
 
-impl<Length, Item> Vec<Length, Item> {
-    pub const fn codec(length: Length, item: Item) -> Self {
-        Self { length, item }
+impl<Item, Length> VecCodec<Item, Length> {
+    pub const fn new(item: Item, length: Length) -> Self {
+        Self { item, length }
     }
 }
 
-impl<Length, Item> Default for Vec<Length, Item>
+impl<'encoded, 'decoded, 'length, Item, Length> crate::Decoder<'encoded, 'decoded> for VecCodec<Item, Length>
 where
-    Length: Default,
-    Item: Default,
-{
-    fn default() -> Self {
-        Self::codec(Length::default(), Item::default())
-    }
-}
-
-impl<'encoded, 'decoded, Length, Item> crate::Decoder<'encoded, 'decoded> for Vec<Length, Item>
-where
-    Length: crate::Decoder<'encoded, 'decoded, Decoded = usize>,
     Item: crate::Decoder<'encoded, 'decoded>,
+    Length: crate::Decoder<'encoded, 'length>,
+    Length::Decoded: TryInto<usize>,
+    <Length::Decoded as TryInto<usize>>::Error: Into<crate::DecodeError>,
 {
     type Decoded = StdVec<Item::Decoded>;
 
     fn decode(&self, encoded: &'encoded [u8], offset: &mut usize) -> Result<Self::Decoded, crate::DecodeError> {
-        let size = self.length.decode(encoded, offset)?;
+        let size = self.length.decode(encoded, offset)?.try_into().map_err(Into::into)?;
         let mut vec = StdVec::with_capacity(size);
         for _ in 0..size {
             let item = self.item.decode(encoded, offset)?;
@@ -45,9 +33,11 @@ where
     }
 }
 
-impl<Length, Item> crate::Encoder for Vec<Length, Item>
+impl<Item, Length> crate::Encoder for VecCodec<Item, Length>
 where
-    Length: crate::Encoder<Decoded = usize>,
+    Length: crate::Encoder,
+    Length::Decoded: TryFrom<usize>,
+    <Length::Decoded as TryFrom<usize>>::Error: Into<crate::EncodeError>,
     Item: crate::Encoder,
     Item::Decoded: Sized,
 {
@@ -55,7 +45,7 @@ where
 
     fn encode(&self, decoded: &Self::Decoded, encoded: &mut [u8], offset: &mut usize) -> Result<(), crate::EncodeError> {
         let size = decoded.len();
-        self.length.encode(&size, encoded, offset)?;
+        self.length.encode(&size.try_into().map_err(Into::into)?, encoded, offset)?;
         for item in decoded.iter() {
             self.item.encode(item, encoded, offset)?;
         }
@@ -63,9 +53,11 @@ where
     }
 }
 
-impl<Length, Item> crate::Measurer for Vec<Length, Item>
+impl<Item, Length> crate::Measurer for VecCodec<Item, Length>
 where
-    Length: crate::Measurer<Decoded = usize>,
+    Length: crate::Measurer,
+    Length::Decoded: TryFrom<usize>,
+    <Length::Decoded as TryFrom<usize>>::Error: Into<crate::EncodeError>,
     Item: crate::Measurer,
     Item::Decoded: Sized,
 {
@@ -73,7 +65,7 @@ where
 
     fn measure(&self, decoded: &Self::Decoded) -> Result<usize, crate::EncodeError> {
         let size = decoded.len();
-        let size_measure = self.length.measure(&size)?;
+        let size_measure = self.length.measure(&size.try_into().map_err(Into::into)?)?;
         let mut items_measure = 0;
         for item in decoded.iter() {
             items_measure += self.item.measure(item)?;
@@ -82,19 +74,15 @@ where
     }
 }
 
-pub struct Remaining;
+pub struct RemainingCodec;
 
-impl Remaining {
-    pub const fn codec() -> Self {
-        Remaining
+impl RemainingCodec {
+    pub const fn new() -> Self {
+        RemainingCodec
     }
 }
 
-impl Default for Remaining {
-    fn default() -> Self { Self::codec() }
-}
-
-impl<'encoded, 'decoded> crate::Decoder<'encoded, 'decoded> for Remaining
+impl<'encoded, 'decoded> crate::Decoder<'encoded, 'decoded> for RemainingCodec
 where
     'encoded: 'decoded,
 {
@@ -110,7 +98,7 @@ where
     }
 }
 
-impl crate::Encoder for Remaining {
+impl crate::Encoder for RemainingCodec {
     type Decoded = [u8];
 
     fn encode(&self, decoded: &Self::Decoded, encoded: &mut [u8], offset: &mut usize) -> Result<(), crate::EncodeError> {
@@ -124,7 +112,7 @@ impl crate::Encoder for Remaining {
     }
 }
 
-impl crate::Measurer for Remaining {
+impl crate::Measurer for RemainingCodec {
     type Decoded = [u8];
 
     fn measure(&self, decoded: &Self::Decoded) -> Result<usize, crate::EncodeError> {
@@ -132,126 +120,153 @@ impl crate::Measurer for Remaining {
     }
 }
 
-#[derive(Copy, Clone)]
-pub struct U64BE;
+pub type BitIndex = usize;
 
-impl U64BE {
-    pub const fn codec() -> Self {
-        U64BE
-    }
+pub trait BitStream: Sized {
+    const BITS: usize;
+
+    fn to_bits(&self) -> impl Iterator<Item = BitIndex>;
+    fn try_from_bits(bits: impl Iterator<Item = BitIndex>) -> Result<Self, DecodeError>;
 }
 
-impl Default for U64BE {
-    fn default() -> Self { Self::codec() }
-}
-
-impl U64BE {
-    fn into_septets_le(num: u64) -> [u8; 10] {
-        let mut bits_from_lsb = (0..64).map(move |bit| num & (1 << bit) != 0);
-
-        let septets_le = iter::from_fn(|| {
-            let mut septet = 0u8;
-            for bit_index in 0..7 {
-                let Some(bit) = bits_from_lsb.next() else {
-                    break;
-                };
-                if bit {
-                    septet |= 1 << bit_index;
+macro_rules! u_bit_stream {
+    ($($ty:tt),*) => {
+        $(impl BitStream for $ty {
+            const BITS: usize = $ty::BITS as usize;
+            
+            fn to_bits(&self) -> impl Iterator<Item = BitIndex> {
+                (0..Self::BITS as usize).filter_map(move |bit_index| {
+                    if (self & (1 << bit_index)) != 0 {
+                        Some(bit_index)
+                    } else {
+                        None
+                    }
+                })
+            }
+            
+            fn try_from_bits(bits: impl Iterator<Item = BitIndex>) -> Result<Self, DecodeError> {
+                let mut value: $ty = 0;
+                for bit_index in bits {
+                    if bit_index >= Self::BITS as usize {
+                        return Err(DecodeError::BitOverflow);
+                    }
+                    value |= 1 << bit_index;
                 }
+                Ok(value)
             }
-            Some(septet)
-        }).take(10);
+            
+        })*
+    }
+}
+u_bit_stream!(u16, u32, u64, u128, usize);
 
-        let mut array = [0u8; 10];
-        for (index, septet) in septets_le.enumerate() {
-            array[index] = septet;
+#[derive(Copy, Clone)]
+pub struct UVarBECodec<T> {
+    pub _marker: PhantomData<T>,
+}
+
+impl<T> UVarBECodec<T> {
+    pub const fn new() -> Self { UVarBECodec { _marker: PhantomData } }
+}
+
+impl<T: BitStream> UVarBECodec<T> {
+    fn try_into_septets_le(num: &T) -> Result<Vec<u8>, crate::EncodeError> {
+        let septets = T::BITS / 7usize + if T::BITS % 7usize == 0 { 0 } else { 1 };
+        let mut septets: Vec<u8> = vec![0u8; septets];
+
+        for bit_index in num.to_bits() {
+            let septet_index = bit_index / 7;
+            let septet = septets.get_mut(septet_index).ok_or(crate::EncodeError::BitOverflow)?;
+            let septet_bit_index = bit_index % 7;
+            *septet = (*septet) | (1 << septet_bit_index);
         }
 
-        array
+        Ok(septets)
     }
 
-    fn into_septets_be(num: u64) -> [u8; 10] {
-        let mut septets_be = Self::into_septets_le(num);
-        septets_be.reverse();
-        septets_be
-    }
-
-    fn from_septets_le(septets_le: [u8; 10]) -> u64 {
-        let septets_le = septets_le.into_iter();
-        let bits_from_lsb = septets_le.flat_map(|septet| {
-            (0..7).map(move |bit_index| (septet & (1 << bit_index)) != 0)
-        }).take(64);
-        let mut value = 0u64;
-        for (bit_index, bit) in bits_from_lsb.enumerate() {
-            if bit {
-                value |= 1 << bit_index;
-            }
-        }
-        value
-    }
-
-    #[allow(dead_code)]
-    fn from_septets_be(septets_be: [u8; 10]) -> u64 {
-        let mut septets_le = septets_be;
+    #[cfg(test)]
+    fn try_into_septets_be(num: &T) -> Result<Vec<u8>, crate::EncodeError> {
+        let mut septets_le = Self::try_into_septets_le(num)?;
         septets_le.reverse();
-        Self::from_septets_le(septets_le)
+        Ok(septets_le)
+    }
+
+    fn try_from_septets_le(septets_le: impl Iterator<Item = u8>) -> Result<T, crate::DecodeError> {
+        let bits = septets_le.flat_map(
+            |septet| (0..7).map(move |septet_bit_index|septet & (1 << septet_bit_index) != 0)
+        );
+        let bits = (0..).zip(bits).filter_map(
+            |(bit_index, bit)| match bit {
+                true => Some(bit_index),
+                false => None,
+            }
+        );
+        T::try_from_bits(bits)
+    }
+
+    fn try_from_septets_be(septets_be: impl DoubleEndedIterator<Item = u8>) -> Result<T, crate::DecodeError> {
+        Self::try_from_septets_le(septets_be.rev())
     }
 }
 
-impl crate::Encoder for U64BE {
-    type Decoded = u64;
-    fn encode(&self, &decoded: &u64, encoded: &mut [u8], offset: &mut usize) -> Result<(), crate::EncodeError> {
-        let septets_be = Self::into_septets_be(decoded);
-        let skip = septets_be.iter().take_while(|&&b| b == 0).count();
-        let trunc_septets_be = &septets_be[skip..];
+impl<T: BitStream> crate::Encoder for UVarBECodec<T> {
+    type Decoded = T;
+    fn encode(&self, decoded: &T, encoded: &mut [u8], offset: &mut usize) -> Result<(), crate::EncodeError> {
+        let septets_le = Self::try_into_septets_le(decoded)?;
 
-        if trunc_septets_be.is_empty() {
-            return 0u8.encode(encoded, offset);
+        let trunc = septets_le.iter().rev().take_while(|&&b| b == 0).count();
+        let full = septets_le.len() - trunc;
+
+        let septets_le = &septets_le[..full];
+
+        if septets_le.is_empty() {
+            return U8Codec.encode(&0, encoded, offset);
         }
 
-        for &septet in &trunc_septets_be[0..trunc_septets_be.len() - 1] {
-            (septet | 0x80).encode(encoded, offset)?;
+        for &septet in septets_le[1..].iter().rev() {
+            U8Codec.encode(&(septet | 0x80), encoded, offset)?;
         }
 
-        trunc_septets_be[trunc_septets_be.len() - 1].encode(encoded, offset)?;
+        U8Codec.encode(&septets_le[0], encoded, offset)?;
 
         Ok(())
     }
 }
 
-impl<'encoded> crate::Decoder<'encoded, '_> for U64BE {
-    type Decoded = u64;
+impl<T: BitStream> crate::Measurer for UVarBECodec<T> {
+    type Decoded = T;
+    fn measure(&self, decoded: &T) -> Result<usize, crate::EncodeError> {
+        let septets_le = Self::try_into_septets_le(decoded)?;
 
-    fn decode(&self, encoded: &'encoded [u8], offset: &mut usize) -> Result<u64, crate::DecodeError> {
-        let mut septets_be = heapless::Vec::<u8, 10>::new();
+        let trunc = septets_le.iter().rev().take_while(|&&b| b == 0).count();
+        let full = septets_le.len() - trunc;
 
-        loop {
-            let flagged_septet = u8::decode(encoded, offset)?;
+        let septets_le = &septets_le[0..full];
+
+        Ok(septets_le.len().max(1))
+    }
+}
+
+impl<'encoded, 'decoded, T: BitStream + 'decoded> crate::Decoder<'encoded, 'decoded> for UVarBECodec<T> {
+    type Decoded = T;
+
+    fn decode(&self, encoded: &'encoded [u8], offset: &mut usize) -> Result<T, crate::DecodeError> {
+        let max_septets = T::BITS / 7usize + if T::BITS % 7usize == 0 { 0 } else { 1 };
+        let mut septets_be: Vec<u8> = Vec::with_capacity(max_septets);
+        for i in 0.. {
+            if i >= max_septets {
+                return Err(crate::DecodeError::BitOverflow);
+            }
+            let flagged_septet = U8Codec.decode(encoded, offset)?;
+            let flag = flagged_septet & 0x80;
             let septet = flagged_septet & 0x7F;
-
-            septets_be.push(septet).map_err(|_| crate::DecodeError::InvalidData)?;
-
-            if flagged_septet & 0x80 == 0 {
+            septets_be.push(septet);
+            if flag == 0 {
                 break;
             }
         }
 
-        let mut septets_le_array = [0u8; 10];
-        for (i, &septet) in septets_be.iter().rev().enumerate() {
-            septets_le_array[i] = septet;
-        }
-
-        Ok(U64BE::from_septets_le(septets_le_array))
-    }
-}
-
-impl crate::Measurer for U64BE {
-    type Decoded = u64;
-    fn measure(&self, &decoded: &u64) -> Result<usize, crate::EncodeError> {
-        let septets_be = Self::into_septets_be(decoded);
-        let skip = septets_be.iter().take_while(|&&b| b == 0).count();
-        let take = septets_be.len() - skip;
-        Ok(take.max(1))
+        Self::try_from_septets_be(septets_be.into_iter())
     }
 }
 
@@ -275,16 +290,16 @@ mod test {
             (u64::MAX,  [0b0000001, 0b1111111, 0b1111111, 0b1111111, 0b1111111, 0b1111111, 0b1111111, 0b1111111, 0b1111111, 0b1111111]),
         ];
         for (num, septets_be_fixture) in fixtures.iter() {
-            let septets_be = U64BE::into_septets_be(*num);
+            let septets_be = UVarBECodec::try_into_septets_be(num).unwrap();
             assert_eq!(&septets_be, septets_be_fixture, "BE septets failed for {}", num);
 
-            let reconstructed_num = U64BE::from_septets_be(*septets_be_fixture);
+            let reconstructed_num: u64 = UVarBECodec::try_from_septets_be(septets_be_fixture.clone().into_iter()).unwrap();
             assert_eq!(&reconstructed_num, num, "BE reconstruction failed for {:?}", septets_be_fixture);
         }
     }
     
     #[test]
-    fn test_u64be() {
+    fn test_uvarbe() {
         let fixtures = [
             (0u64,      vec![0b00000000]),
             (1u64,      vec![0b00000001]),
@@ -297,85 +312,33 @@ mod test {
         ];
 
         for (num, encoded_fixture) in fixtures.iter() {
-            let encoded = U64BE.encode_to_vec(num).expect("Encoding failed");
+            let encoded = UVarBECodec::new().encode_to_vec(num).expect("Encoding failed");
             assert_eq!(&encoded, encoded_fixture, "Encoding failed for {}", num);
 
-            let decoded = U64BE.decode(&encoded, &mut 0).expect("Decoding failed");
+            let decoded: u64 = UVarBECodec::new().decode(&encoded, &mut 0).expect("Decoding failed");
             assert_eq!(&decoded, num, "Decoding failed for {:?}", encoded);
         }
     }
 }
 
-macro_rules! define_u_be {
-    ($name:ident, $ty:ty) => {
-        pub struct $name;
-
-        impl $name {
-            pub const fn codec() -> Self {
-                $name
-            }
-        }
-
-        impl Default for $name {
-            fn default() -> Self { Self::codec() }
-        }
-
-        impl<'encoded> crate::Decoder<'encoded, '_> for $name {
-            type Decoded = $ty;
-            fn decode(&self, encoded: &'encoded [u8], offset: &mut usize) -> Result<$ty, crate::DecodeError> {
-                let u64_value = U64BE.decode(encoded, offset)?;
-                let val: $ty = u64_value.try_into().map_err(|_| crate::DecodeError::ConversionFailure)?;
-                Ok(val)
-            }
-        }
-
-        impl crate::Encoder for $name {
-            type Decoded = $ty;
-            fn encode(&self, decoded: &Self::Decoded, encoded: &mut [u8], offset: &mut usize) -> Result<(), crate::EncodeError> {
-                let u64_value = *decoded as u64;
-                U64BE.encode(&u64_value, encoded, offset)
-            }
-        }
-
-        impl crate::Measurer for $name {
-            type Decoded = $ty;
-            fn measure(&self, decoded: &Self::Decoded) -> Result<usize, crate::EncodeError> {
-                let u64_value = *decoded as u64;
-                U64BE.measure(&u64_value)
-            }
-        }
-    };
-}
-
-define_u_be!(USizeBE, usize);
-define_u_be!(U32BE, u32);
-define_u_be!(U16BE, u16);
-
-pub struct Option<Item> {
+pub struct OptionCodec<Item> {
     pub item: Item,
 }
 
-impl<Item> Option<Item> {
-    pub fn codec(item: Item) -> Self {
+impl<Item> OptionCodec<Item> {
+    pub fn new(item: Item) -> Self {
         Self { item }
     }
 }
 
-impl<Item> Default for Option<Item>
-where
-    Item: Default,
-{
-    fn default() -> Self { Self::codec(Item::default()) }
-}
-
-impl<'encoded, 'decoded, Item> crate::Decoder<'encoded, 'decoded> for Option<Item>
+impl<'encoded, 'decoded, Item> crate::Decoder<'encoded, 'decoded> for OptionCodec<Item>
 where
     Item: crate::Decoder<'encoded, 'decoded>,
 {
     type Decoded = StdOption<Item::Decoded>;
 
     fn decode(&self, encoded: &'encoded [u8], offset: &mut usize) -> Result<Self::Decoded, crate::DecodeError> {
-        let flag = bool::decode(encoded, offset)?;
+        let flag = BoolCodec.decode(encoded, offset)?;
         if flag {
             Ok(StdOption::None)
         } else {
@@ -385,7 +348,7 @@ where
     }
 }
 
-impl<Item> crate::Encoder for Option<Item>
+impl<Item> crate::Encoder for OptionCodec<Item>
 where
     Item: crate::Encoder,
     Item::Decoded: Sized,
@@ -395,18 +358,18 @@ where
     fn encode(&self, decoded: &Self::Decoded, encoded: &mut [u8], offset: &mut usize) -> Result<(), crate::EncodeError> {
         match decoded {
             StdOption::None => {
-                true.encode(encoded, offset)?;
+                BoolCodec.encode(&true, encoded, offset)?;
                 Ok(())
             }
             StdOption::Some(item) => {
-                false.encode(encoded, offset)?;
+                BoolCodec.encode(&false, encoded, offset)?;
                 self.item.encode(item, encoded, offset)
             }
         }
     }
 }
 
-impl<Item> crate::Measurer for Option<Item>
+impl<Item> crate::Measurer for OptionCodec<Item>
 where
     Item: crate::Measurer,
     Item::Decoded: Sized,
@@ -415,46 +378,38 @@ where
 
     fn measure(&self, decoded: &Self::Decoded) -> Result<usize, crate::EncodeError> {
         Ok(match decoded {
-            StdOption::None => true.measure()?,
+            StdOption::None => BoolCodec.measure(&true)?,
             StdOption::Some(item) => {
-                false.measure()?
+                BoolCodec.measure(&false)?
                 + self.item.measure(item)?
             }
         })
     }
 }
 
-
-pub struct Slice<Length> {
+pub struct BytesCodec<Length> {
     pub length: Length,
 }
 
-impl<Length> Slice<Length> {
-    pub const fn codec(length: Length) -> Self {
+impl<Length> BytesCodec<Length> {
+    pub const fn new(length: Length) -> Self {
         Self {
             length,
         }
     }
 }
 
-impl<Length> Default for Slice<Length>
+impl<'encoded, 'decoded, 'length, Length> crate::Decoder<'encoded, 'decoded> for BytesCodec<Length>
 where
-    Length: Default,
-{
-    fn default() -> Self {
-        Self::codec(Length::default())
-    }
-}
-
-impl<'encoded, 'decoded, Length> crate::Decoder<'encoded, 'decoded> for Slice<Length>
-where
-    Length: for<'length> crate::Decoder<'encoded, 'length, Decoded = usize>,
+    Length: crate::Decoder<'encoded, 'length>,
+    Length::Decoded: TryInto<usize>,
+    <Length::Decoded as TryInto<usize>>::Error: Into<crate::DecodeError>,
     'encoded: 'decoded,
 {
     type Decoded = &'decoded [u8];
 
     fn decode(&self, encoded: &'encoded [u8], offset: &mut usize) -> Result<Self::Decoded, crate::DecodeError> {
-        let size = self.length.decode(encoded, offset)?;
+        let size = self.length.decode(encoded, offset)?.try_into().map_err(Into::into)?;
         if *offset + size > encoded.len() {
             return Err(crate::DecodeError::InvalidData);
         }
@@ -464,15 +419,17 @@ where
     }
 }
 
-impl<Length> crate::Encoder for Slice<Length>
+impl<Length> crate::Encoder for BytesCodec<Length>
 where
-    Length: crate::Encoder<Decoded = usize>,
+    Length: crate::Encoder,
+    Length::Decoded: TryFrom<usize>,
+    <Length::Decoded as TryFrom<usize>>::Error: Into<crate::EncodeError>,
 {
     type Decoded = [u8];
 
     fn encode(&self, decoded: &Self::Decoded, encoded: &mut [u8], offset: &mut usize) -> Result<(), crate::EncodeError> {
         let size = decoded.len();
-        self.length.encode(&size, encoded, offset)?;
+        self.length.encode(&size.try_into().map_err(Into::into)?, encoded, offset)?;
         let end = *offset + size;
         if end > encoded.len() {
             return Err(crate::EncodeError::BufferTooSmall);
@@ -483,15 +440,17 @@ where
     }
 }
 
-impl<Length> crate::Measurer for Slice<Length>
+impl<Length> crate::Measurer for BytesCodec<Length>
 where
-    Length: crate::Measurer<Decoded = usize>,
+    Length: crate::Measurer,
+    Length::Decoded: TryFrom<usize>,
+    <Length::Decoded as TryFrom<usize>>::Error: Into<crate::EncodeError>,
 {
     type Decoded = [u8];
 
     fn measure(&self, decoded: &Self::Decoded) -> Result<usize, crate::EncodeError> {
         let size = decoded.len();
-        let size_measure = self.length.measure(&size)?;
+        let size_measure = self.length.measure(&size.try_into().map_err(Into::into)?)?;
         Ok(size_measure + size)
     }
 }

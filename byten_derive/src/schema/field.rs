@@ -2,7 +2,7 @@ use proc_macro2::Span;
 use syn::{Fields, FieldsNamed, Ident};
 use quote::{ToTokens, quote};
 
-use crate::{interpret_codec_schema, parse_byten_attribute};
+use crate::{build_codec_schema};
 
 use super::{BinarySchema, DecodeContext, EncodeContext, MeasureContext};
 
@@ -10,12 +10,12 @@ pub trait FieldsSchema: BinarySchema {
     fn wildcard_pattern(&self) -> proc_macro2::TokenStream;
 }
 
-pub fn interpret_fields_schema(fields: &Fields) -> Box<dyn FieldsSchema> {
-    match fields {
-        Fields::Named(fields) => Box::new(NamedFieldsSchema::interpret(fields)),
-        Fields::Unnamed(fields) => Box::new(UnnamedFieldsSchema::interpret(fields)),
+pub fn interpret_fields_schema(fields: &Fields) -> syn::Result<Box<dyn FieldsSchema>> {
+    Ok(match fields {
+        Fields::Named(fields) => Box::new(NamedFieldsSchema::interpret(fields)?),
+        Fields::Unnamed(fields) => Box::new(UnnamedFieldsSchema::interpret(fields)?),
         Fields::Unit => Box::new(UnitFieldsSchema {}),
-    }
+    })
 }
 
 struct NamedFieldsSchema {
@@ -29,32 +29,33 @@ impl FieldsSchema for NamedFieldsSchema {
 }
 
 impl NamedFieldsSchema {
-    fn interpret(fields: &FieldsNamed) -> NamedFieldsSchema {
+    fn interpret(fields: &FieldsNamed) -> syn::Result<NamedFieldsSchema> {
         let fields = fields.named.iter().map(|field| {
-            let ident = field.ident.clone().expect("Named field must have an identifier");
-            let ty = &field.ty;
-            let codec_path = parse_byten_attribute(&field.attrs).unwrap_or_else(|| syn::parse_quote!{
-                ::byten::SelfCodec::<#ty>::default()
-            });
-            let codec = interpret_codec_schema(&codec_path);
-            (ident, codec)
-        }).collect();
-        NamedFieldsSchema {
+            let ident = field.ident.clone().ok_or_else(|| {
+                syn::Error::new_spanned(
+                    field,
+                    "Named field must have an identifier",
+                )
+            })?;
+            let codec = build_codec_schema(&field.attrs, Some(&field.ty))?;
+            Ok((ident, codec))
+        }).collect::<syn::Result<Vec<_>>>()?;
+        Ok(NamedFieldsSchema {
             fields,
-        }
+        })
     }
 }
 
 impl BinarySchema for NamedFieldsSchema {
-    fn decode(&self, ctx: &DecodeContext) -> proc_macro2::TokenStream {
+    fn decode(&self, ctx: &DecodeContext) -> syn::Result<proc_macro2::TokenStream> {
         let fields = self.fields.iter().map(|(ident, schema)| {
-            let decode = schema.decode(&ctx.clone());
-            quote! { #ident: #decode }
-        });
-        quote! { { #(#fields),* } }
+            let decode = schema.decode(&ctx.clone())?;
+            Ok(quote! { #ident: #decode })
+        }).collect::<syn::Result<Vec<_>>>()?;
+        Ok(quote! { { #(#fields),* } })
     }
 
-    fn encode(&self, ctx: &EncodeContext) -> proc_macro2::TokenStream {
+    fn encode(&self, ctx: &EncodeContext) -> syn::Result<proc_macro2::TokenStream> {
         let wrapper = &ctx.decoded;
         let type_path = &ctx.wrapper;
         let idents = self.fields.iter().map(|(ident, _)| ident).collect::<Vec<_>>();
@@ -68,14 +69,14 @@ impl BinarySchema for NamedFieldsSchema {
                 encoded: ctx.encoded.clone(),
                 offset: ctx.offset.clone(),
             })
-        });
-        quote! { 
+        }).collect::<syn::Result<Vec<_>>>()?;
+        Ok(quote! { 
             let #type_path { #(#idents: #variables,)* } = #wrapper else { unreachable!() };
             #(#encodes;)*
-        }
+        })
     }
 
-    fn measure(&self, ctx: &MeasureContext) -> proc_macro2::TokenStream {
+    fn measure(&self, ctx: &MeasureContext) -> syn::Result<proc_macro2::TokenStream> {
         let wrapper = &ctx.decoded;
         let type_path = &ctx.wrapper;
         let idents = self.fields.iter().map(|(ident, _)| ident).collect::<Vec<_>>();
@@ -87,20 +88,20 @@ impl BinarySchema for NamedFieldsSchema {
                 wrapper: quote! {},
                 decoded: variable.into_token_stream(),
             })
-        });
-        quote! { {
+        }).collect::<syn::Result<Vec<_>>>()?;
+        Ok(quote! { {
             let #type_path { #(#idents: #variables,)* } = #wrapper else { unreachable!() };
             0 #( + #measures )*
-        } }
+        } })
     }
 
-    fn measure_fixed(&self) -> proc_macro2::TokenStream {
+    fn measure_fixed(&self) -> syn::Result<proc_macro2::TokenStream> {
         let measures = self.fields.iter().map(|(_, schema)| {
             schema.measure_fixed()
-        });
-        quote! {
+        }).collect::<syn::Result<Vec<_>>>()?;
+        Ok(quote! {
             0 #( + #measures )*
-        }
+        })
     }
 }
 
@@ -115,28 +116,29 @@ impl FieldsSchema for UnnamedFieldsSchema {
 }
 
 impl UnnamedFieldsSchema {
-    fn interpret(fields: &syn::FieldsUnnamed) -> UnnamedFieldsSchema {
+    fn interpret(fields: &syn::FieldsUnnamed) -> syn::Result<UnnamedFieldsSchema> {
         let fields = fields.unnamed.iter().map(|field| {
-            if field.ident.is_some() { panic!("Unnamed field must not have an identifier"); }
-            let ty = &field.ty;
-            let codec_path = parse_byten_attribute(&field.attrs).unwrap_or_else(|| syn::parse_quote!{
-                ::byten::SelfCodec::<#ty>::default()
-            });
-            interpret_codec_schema(&codec_path)
-        }).collect();
-        UnnamedFieldsSchema { fields }
+            if let Some(ident) = &field.ident {
+                return Err(syn::Error::new_spanned(
+                    ident,
+                    "Unnamed field must not have an identifier",
+                ));
+            }
+            build_codec_schema(&field.attrs, Some(&field.ty))
+        }).collect::<syn::Result<Vec<_>>>()?;
+        Ok(UnnamedFieldsSchema { fields })
     }
 }
 
 impl BinarySchema for UnnamedFieldsSchema {
-    fn decode(&self, ctx: &DecodeContext) -> proc_macro2::TokenStream {
+    fn decode(&self, ctx: &DecodeContext) -> syn::Result<proc_macro2::TokenStream> {
         let fields = self.fields.iter().map(|schema| {
             schema.decode(&ctx.clone())
-        });
-        quote! { ( #(#fields),* ) }
+        }).collect::<syn::Result<Vec<_>>>()?;
+        Ok(quote! { ( #(#fields),* ) })
     }
 
-    fn encode(&self, ctx: &EncodeContext) -> proc_macro2::TokenStream {
+    fn encode(&self, ctx: &EncodeContext) -> syn::Result<proc_macro2::TokenStream> {
         let decoded = &ctx.decoded;
         let wrapper = &ctx.wrapper;
         let variables = self.fields.iter()
@@ -150,14 +152,14 @@ impl BinarySchema for UnnamedFieldsSchema {
                 encoded: ctx.encoded.clone(),
                 offset: ctx.offset.clone(),
             })
-        });
-        quote! { 
+        }).collect::<syn::Result<Vec<_>>>()?;
+        Ok(quote! {
             let #wrapper ( #(#variables),* ) = #decoded else { unreachable!() };
             #(#encodes;)*
-        }
+        })
     }
 
-    fn measure(&self, ctx: &MeasureContext) -> proc_macro2::TokenStream {
+    fn measure(&self, ctx: &MeasureContext) -> syn::Result<proc_macro2::TokenStream> {
         let decoded = &ctx.decoded;
         let wrapper = &ctx.wrapper;
         let variables = self.fields.iter()
@@ -169,20 +171,20 @@ impl BinarySchema for UnnamedFieldsSchema {
                 wrapper: quote! {},
                 decoded: variable.into_token_stream(),
             })
-        });
-        quote! { {
+        }).collect::<syn::Result<Vec<_>>>()?;
+        Ok(quote! { {
             let #wrapper ( #(#variables),* ) = #decoded else { unreachable!() };
             0 #( + #measures )*
-        } }
+        } })
     }
 
-    fn measure_fixed(&self) -> proc_macro2::TokenStream {
+    fn measure_fixed(&self) -> syn::Result<proc_macro2::TokenStream> {
         let measures = self.fields.iter().map(|schema| {
             schema.measure_fixed()
-        });
-        quote! {
+        }).collect::<syn::Result<Vec<_>>>()?;
+        Ok(quote! {
             0 #( + #measures )*
-        }
+        })
     }
 }
 
@@ -195,20 +197,20 @@ impl FieldsSchema for UnitFieldsSchema {
 }
 
 impl BinarySchema for UnitFieldsSchema {
-    fn decode(&self, _ctx: &DecodeContext) -> proc_macro2::TokenStream {
-        quote! {}
+    fn decode(&self, _ctx: &DecodeContext) -> syn::Result<proc_macro2::TokenStream> {
+        Ok(quote! {})
     }
 
-    fn encode(&self, _ctx: &EncodeContext) -> proc_macro2::TokenStream {
-        quote! {}
+    fn encode(&self, _ctx: &EncodeContext) -> syn::Result<proc_macro2::TokenStream> {
+        Ok(quote! {})
     }
 
-    fn measure(&self, _ctx: &MeasureContext) -> proc_macro2::TokenStream {
-        quote! { 0 }
+    fn measure(&self, _ctx: &MeasureContext) -> syn::Result<proc_macro2::TokenStream> {
+        Ok(quote! { 0 })
     }
 
-    fn measure_fixed(&self) -> proc_macro2::TokenStream {
-        quote! { 0 }
+    fn measure_fixed(&self) -> syn::Result<proc_macro2::TokenStream> {
+        Ok(quote! { 0 })
     }
 }
 
