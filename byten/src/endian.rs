@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 #[derive(Clone, Copy)]
 pub enum Endianness {
     Big,
@@ -12,13 +14,21 @@ pub trait EndianCoded {
 }
 
 pub struct EndianCodec<T> {
-    endianness: Endianness,
-    _marker: std::marker::PhantomData<T>,
+    pub endianness: Endianness,
+    _marker: PhantomData<T>,
 }
 
 impl<T> EndianCodec<T> {
     pub const fn new(endianness: Endianness) -> Self {
-        Self { endianness, _marker: std::marker::PhantomData }
+        Self { endianness, _marker: PhantomData }
+    }
+
+    pub const fn le() -> Self {
+        Self::new(Endianness::Little)
+    }
+
+    pub const fn be() -> Self {
+        Self::new(Endianness::Big)
     }
 }
 
@@ -74,7 +84,7 @@ impl<T: EndianCoded> crate::FixedMeasurer for EndianCodec<T> {
 impl<T: EndianCoded> crate::Measurer for EndianCodec<T> {
     type Decoded = T;
 
-    fn measure(&self, _decoded: &Self::Decoded) -> Result<usize, crate::EncodeError> {
+    fn measure(&self, _decoded: &Self::Decoded) -> Result<usize, crate::error::EncodeError> {
         Ok(crate::FixedMeasurer::measure_fixed(self))
     }
 }

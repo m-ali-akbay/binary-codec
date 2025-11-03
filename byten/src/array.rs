@@ -1,4 +1,4 @@
-use crate::{DecodeError, Decoder, EncodeError, Encoder, FixedMeasurer, Measurer};
+use crate::{error::DecodeError, Decoder, error::EncodeError, Encoder, FixedMeasurer, Measurer};
 
 pub struct ArrayCodec<Item, const N: usize>(pub Item);
 

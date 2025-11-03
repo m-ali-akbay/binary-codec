@@ -14,6 +14,8 @@ pub struct Person<'encoded> {
     #[byten($bytes[u32 $uvarbe])]
     pub avatar_image: &'encoded [u8],
 
+    passcode: &'encoded [u8; 4],
+
     #[byten(.. $utf8)]
     pub extra_data: &'encoded str,
 }
@@ -23,7 +25,8 @@ fn main() {
         first_name: CStr::from_bytes_with_nul(b"Alice\0").unwrap(),
         last_name: CStr::from_bytes_with_nul(b"Smith\0").unwrap(),
         address: "123 Main St, Springfield",
-        avatar_image: &[0, 1, 2, 3, 4, 5],
+        avatar_image: &[0x11, 0x22, 0x33, 0x44, 0x55, 0x66],
+        passcode: &[1, 2, 3, 4],
         extra_data: &"Some extra information",
     };
 

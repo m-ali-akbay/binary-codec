@@ -1,7 +1,7 @@
-use crate::{DecodeError, Decoder, DefaultCodec, EncodeError, Encoder, Measurer};
+use crate::{error::DecodeError, Decoder, DefaultCodec, error::EncodeError, Encoder, Measurer};
 
 pub trait DecodeDefault<'encoded>: Sized {
-    fn decode(encoded: &'encoded [u8], offset: &mut usize) -> Result<Self, DecodeError>;
+    fn decode(encoded: &'encoded [u8], offset: &mut usize) -> Result<Self, crate::error::DecodeError>;
 }
 
 impl<'encoded, 'decoded, T> DecodeDefault<'encoded> for T
@@ -56,7 +56,7 @@ pub trait EncoderToVec {
 
 impl<Decoded: ?Sized, C: Encoder<Decoded=Decoded> + Measurer<Decoded=Decoded>> EncoderToVec for C {
     type Decoded = Decoded;
-    fn encode_to_vec(&self, decoded: &Self::Decoded) -> Result<Vec<u8>, EncodeError> {
+    fn encode_to_vec(&self, decoded: &Self::Decoded) -> Result<Vec<u8>, crate::error::EncodeError> {
         let size = self.measure(decoded)?;
         let mut vec = vec![0u8; size];
         let mut offset = 0;
