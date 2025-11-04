@@ -1,6 +1,6 @@
 use std::ffi::{CStr, CString};
 
-use byten::{Decode, DecodeOwned, DefaultCodec, Encode, Measure, EncodeToVec as _};
+use byten::{Decode, DecodeOwned, DefaultCodec, Encode, EncodeToVec as _, Measure};
 
 #[derive(Debug, DefaultCodec, Encode, Measure, DecodeOwned)]
 pub struct Directory {
@@ -38,13 +38,11 @@ fn main() {
             })),
             Box::new(Entry::Directory(Directory {
                 name: CString::new("subdir").unwrap(),
-                entries: vec![
-                    Box::new(Entry::File(File {
-                        name: CString::new("file2.txt").unwrap(),
-                        content: b"Rust is awesome!".to_vec(),
-                        assigned_application_id: None,
-                    })),
-                ],
+                entries: vec![Box::new(Entry::File(File {
+                    name: CString::new("file2.txt").unwrap(),
+                    content: b"Rust is awesome!".to_vec(),
+                    assigned_application_id: None,
+                }))],
             })),
         ],
     };

@@ -1,6 +1,6 @@
 use std::{marker::PhantomData, option::Option as StdOption, vec::Vec as StdVec};
 
-use crate::{BoolCodec, error::DecodeError, U8Codec};
+use crate::{BoolCodec, U8Codec, error::DecodeError};
 
 pub struct VecCodec<Item, Length> {
     pub item: Item,
@@ -13,7 +13,8 @@ impl<Item, Length> VecCodec<Item, Length> {
     }
 }
 
-impl<'encoded, 'decoded, 'length, Item, Length> crate::Decoder<'encoded, 'decoded> for VecCodec<Item, Length>
+impl<'encoded, 'decoded, 'length, Item, Length> crate::Decoder<'encoded, 'decoded>
+    for VecCodec<Item, Length>
 where
     Item: crate::Decoder<'encoded, 'decoded>,
     Length: crate::Decoder<'encoded, 'length>,
@@ -22,8 +23,16 @@ where
 {
     type Decoded = StdVec<Item::Decoded>;
 
-    fn decode(&self, encoded: &'encoded [u8], offset: &mut usize) -> Result<Self::Decoded, crate::DecodeError> {
-        let size = self.length.decode(encoded, offset)?.try_into().map_err(Into::into)?;
+    fn decode(
+        &self,
+        encoded: &'encoded [u8],
+        offset: &mut usize,
+    ) -> Result<Self::Decoded, crate::DecodeError> {
+        let size = self
+            .length
+            .decode(encoded, offset)?
+            .try_into()
+            .map_err(Into::into)?;
         let mut vec = StdVec::with_capacity(size);
         for _ in 0..size {
             let item = self.item.decode(encoded, offset)?;
@@ -43,9 +52,15 @@ where
 {
     type Decoded = StdVec<Item::Decoded>;
 
-    fn encode(&self, decoded: &Self::Decoded, encoded: &mut [u8], offset: &mut usize) -> Result<(), crate::EncodeError> {
+    fn encode(
+        &self,
+        decoded: &Self::Decoded,
+        encoded: &mut [u8],
+        offset: &mut usize,
+    ) -> Result<(), crate::EncodeError> {
         let size = decoded.len();
-        self.length.encode(&size.try_into().map_err(Into::into)?, encoded, offset)?;
+        self.length
+            .encode(&size.try_into().map_err(Into::into)?, encoded, offset)?;
         for item in decoded.iter() {
             self.item.encode(item, encoded, offset)?;
         }
@@ -88,7 +103,11 @@ where
 {
     type Decoded = &'decoded [u8];
 
-    fn decode(&self, encoded: &'encoded [u8], offset: &mut usize) -> Result<Self::Decoded, crate::error::DecodeError> {
+    fn decode(
+        &self,
+        encoded: &'encoded [u8],
+        offset: &mut usize,
+    ) -> Result<Self::Decoded, crate::error::DecodeError> {
         if *offset > encoded.len() {
             return Err(crate::error::DecodeError::InvalidData);
         }
@@ -101,7 +120,12 @@ where
 impl crate::Encoder for RemainingCodec {
     type Decoded = [u8];
 
-    fn encode(&self, decoded: &Self::Decoded, encoded: &mut [u8], offset: &mut usize) -> Result<(), crate::error::EncodeError> {
+    fn encode(
+        &self,
+        decoded: &Self::Decoded,
+        encoded: &mut [u8],
+        offset: &mut usize,
+    ) -> Result<(), crate::error::EncodeError> {
         let end = *offset + decoded.len();
         if end > encoded.len() {
             return Err(crate::error::EncodeError::BufferTooSmall);
@@ -126,14 +150,16 @@ pub trait BitStream: Sized {
     const BITS: usize;
 
     fn to_bits(&self) -> impl Iterator<Item = BitIndex>;
-    fn try_from_bits(bits: impl Iterator<Item = BitIndex>) -> Result<Self, crate::error::DecodeError>;
+    fn try_from_bits(
+        bits: impl Iterator<Item = BitIndex>,
+    ) -> Result<Self, crate::error::DecodeError>;
 }
 
 macro_rules! u_bit_stream {
     ($($ty:tt),*) => {
         $(impl BitStream for $ty {
             const BITS: usize = $ty::BITS as usize;
-            
+
             fn to_bits(&self) -> impl Iterator<Item = BitIndex> {
                 (0..Self::BITS as usize).filter_map(move |bit_index| {
                     if (self & (1 << bit_index)) != 0 {
@@ -143,7 +169,7 @@ macro_rules! u_bit_stream {
                     }
                 })
             }
-            
+
             fn try_from_bits(bits: impl Iterator<Item = BitIndex>) -> Result<Self, DecodeError> {
                 let mut value: $ty = 0;
                 for bit_index in bits {
@@ -154,7 +180,7 @@ macro_rules! u_bit_stream {
                 }
                 Ok(value)
             }
-            
+
         })*
     }
 }
@@ -166,7 +192,11 @@ pub struct UVarBECodec<T> {
 }
 
 impl<T> UVarBECodec<T> {
-    pub const fn new() -> Self { UVarBECodec { _marker: PhantomData } }
+    pub const fn new() -> Self {
+        UVarBECodec {
+            _marker: PhantomData,
+        }
+    }
 }
 
 impl<T: BitStream> UVarBECodec<T> {
@@ -176,7 +206,9 @@ impl<T: BitStream> UVarBECodec<T> {
 
         for bit_index in num.to_bits() {
             let septet_index = bit_index / 7;
-            let septet = septets.get_mut(septet_index).ok_or(crate::error::EncodeError::BitOverflow)?;
+            let septet = septets
+                .get_mut(septet_index)
+                .ok_or(crate::error::EncodeError::BitOverflow)?;
             let septet_bit_index = bit_index % 7;
             *septet = (*septet) | (1 << septet_bit_index);
         }
@@ -191,27 +223,34 @@ impl<T: BitStream> UVarBECodec<T> {
         Ok(septets_le)
     }
 
-    fn try_from_septets_le(septets_le: impl Iterator<Item = u8>) -> Result<T, crate::error::DecodeError> {
-        let bits = septets_le.flat_map(
-            |septet| (0..7).map(move |septet_bit_index|septet & (1 << septet_bit_index) != 0)
-        );
-        let bits = (0..).zip(bits).filter_map(
-            |(bit_index, bit)| match bit {
-                true => Some(bit_index),
-                false => None,
-            }
-        );
+    fn try_from_septets_le(
+        septets_le: impl Iterator<Item = u8>,
+    ) -> Result<T, crate::error::DecodeError> {
+        let bits = septets_le.flat_map(|septet| {
+            (0..7).map(move |septet_bit_index| septet & (1 << septet_bit_index) != 0)
+        });
+        let bits = (0..).zip(bits).filter_map(|(bit_index, bit)| match bit {
+            true => Some(bit_index),
+            false => None,
+        });
         T::try_from_bits(bits)
     }
 
-    fn try_from_septets_be(septets_be: impl DoubleEndedIterator<Item = u8>) -> Result<T, crate::error::DecodeError> {
+    fn try_from_septets_be(
+        septets_be: impl DoubleEndedIterator<Item = u8>,
+    ) -> Result<T, crate::error::DecodeError> {
         Self::try_from_septets_le(septets_be.rev())
     }
 }
 
 impl<T: BitStream> crate::Encoder for UVarBECodec<T> {
     type Decoded = T;
-    fn encode(&self, decoded: &T, encoded: &mut [u8], offset: &mut usize) -> Result<(), crate::error::EncodeError> {
+    fn encode(
+        &self,
+        decoded: &T,
+        encoded: &mut [u8],
+        offset: &mut usize,
+    ) -> Result<(), crate::error::EncodeError> {
         let septets_le = Self::try_into_septets_le(decoded)?;
 
         let trunc = septets_le.iter().rev().take_while(|&&b| b == 0).count();
@@ -247,10 +286,16 @@ impl<T: BitStream> crate::Measurer for UVarBECodec<T> {
     }
 }
 
-impl<'encoded, 'decoded, T: BitStream + 'decoded> crate::Decoder<'encoded, 'decoded> for UVarBECodec<T> {
+impl<'encoded, 'decoded, T: BitStream + 'decoded> crate::Decoder<'encoded, 'decoded>
+    for UVarBECodec<T>
+{
     type Decoded = T;
 
-    fn decode(&self, encoded: &'encoded [u8], offset: &mut usize) -> Result<T, crate::error::DecodeError> {
+    fn decode(
+        &self,
+        encoded: &'encoded [u8],
+        offset: &mut usize,
+    ) -> Result<T, crate::error::DecodeError> {
         let max_septets = T::BITS / 7usize + if T::BITS % 7usize == 0 { 0 } else { 1 };
         let mut septets_be: Vec<u8> = Vec::with_capacity(max_septets);
         for i in 0.. {
@@ -272,50 +317,117 @@ impl<'encoded, 'decoded, T: BitStream + 'decoded> crate::Decoder<'encoded, 'deco
 
 #[cfg(test)]
 mod test {
-    use crate::prelude::EncoderToVec;
     use crate::Decoder as _;
+    use crate::prelude::EncoderToVec;
 
     use super::*;
 
     #[test]
     fn test_septets_le() {
         let fixtures = [
-            (0u64,      [0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000]),
-            (1u64,      [0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000001]),
-            (127u64,    [0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b1111111]),
-            (128u64,    [0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000001, 0b0000000]),
-            (255u64,    [0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000001, 0b1111111]),
-            (16383u64,  [0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b1111111, 0b1111111]),
-            (16384u64,  [0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000001, 0b0000000, 0b0000000]),
-            (u64::MAX,  [0b0000001, 0b1111111, 0b1111111, 0b1111111, 0b1111111, 0b1111111, 0b1111111, 0b1111111, 0b1111111, 0b1111111]),
+            (
+                0u64,
+                [
+                    0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000,
+                    0b0000000, 0b0000000, 0b0000000,
+                ],
+            ),
+            (
+                1u64,
+                [
+                    0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000,
+                    0b0000000, 0b0000000, 0b0000001,
+                ],
+            ),
+            (
+                127u64,
+                [
+                    0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000,
+                    0b0000000, 0b0000000, 0b1111111,
+                ],
+            ),
+            (
+                128u64,
+                [
+                    0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000,
+                    0b0000000, 0b0000001, 0b0000000,
+                ],
+            ),
+            (
+                255u64,
+                [
+                    0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000,
+                    0b0000000, 0b0000001, 0b1111111,
+                ],
+            ),
+            (
+                16383u64,
+                [
+                    0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000,
+                    0b0000000, 0b1111111, 0b1111111,
+                ],
+            ),
+            (
+                16384u64,
+                [
+                    0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000, 0b0000000,
+                    0b0000001, 0b0000000, 0b0000000,
+                ],
+            ),
+            (
+                u64::MAX,
+                [
+                    0b0000001, 0b1111111, 0b1111111, 0b1111111, 0b1111111, 0b1111111, 0b1111111,
+                    0b1111111, 0b1111111, 0b1111111,
+                ],
+            ),
         ];
         for (num, septets_be_fixture) in fixtures.iter() {
             let septets_be = UVarBECodec::try_into_septets_be(num).unwrap();
-            assert_eq!(&septets_be, septets_be_fixture, "BE septets failed for {}", num);
+            assert_eq!(
+                &septets_be, septets_be_fixture,
+                "BE septets failed for {}",
+                num
+            );
 
-            let reconstructed_num: u64 = UVarBECodec::try_from_septets_be(septets_be_fixture.clone().into_iter()).unwrap();
-            assert_eq!(&reconstructed_num, num, "BE reconstruction failed for {:?}", septets_be_fixture);
+            let reconstructed_num: u64 =
+                UVarBECodec::try_from_septets_be(septets_be_fixture.clone().into_iter()).unwrap();
+            assert_eq!(
+                &reconstructed_num, num,
+                "BE reconstruction failed for {:?}",
+                septets_be_fixture
+            );
         }
     }
-    
+
     #[test]
     fn test_uvarbe() {
         let fixtures = [
-            (0u64,      vec![0b00000000]),
-            (1u64,      vec![0b00000001]),
-            (127u64,    vec![0b01111111]),
-            (128u64,    vec![0b10000001, 0b00000000]),
-            (255u64,    vec![0b10000001, 0b01111111]),
-            (16383u64,  vec![0b11111111, 0b01111111]),
-            (16384u64,  vec![0b10000001, 0b10000000, 0b00000000]),
-            (u64::MAX,  vec![0b10000001, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b01111111]),
+            (0u64, vec![0b00000000]),
+            (1u64, vec![0b00000001]),
+            (127u64, vec![0b01111111]),
+            (128u64, vec![0b10000001, 0b00000000]),
+            (255u64, vec![0b10000001, 0b01111111]),
+            (16383u64, vec![0b11111111, 0b01111111]),
+            (16384u64, vec![0b10000001, 0b10000000, 0b00000000]),
+            (
+                u64::MAX,
+                vec![
+                    0b10000001, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111,
+                    0b11111111, 0b11111111, 0b11111111, 0b01111111,
+                ],
+            ),
         ];
 
         for (num, encoded_fixture) in fixtures.iter() {
-            let encoded = UVarBECodec::new().encode_to_vec(num).expect("Encoding failed");
+            let encoded = UVarBECodec::new()
+                .encode_to_vec(num)
+                .expect("Encoding failed");
             assert_eq!(&encoded, encoded_fixture, "Encoding failed for {}", num);
 
-            let decoded: u64 = UVarBECodec::new().decode(&encoded, &mut 0).expect("Decoding failed");
+            let decoded: u64 = UVarBECodec::new()
+                .decode(&encoded, &mut 0)
+                .expect("Decoding failed");
             assert_eq!(&decoded, num, "Decoding failed for {:?}", encoded);
         }
     }
@@ -337,7 +449,11 @@ where
 {
     type Decoded = StdOption<Item::Decoded>;
 
-    fn decode(&self, encoded: &'encoded [u8], offset: &mut usize) -> Result<Self::Decoded, crate::error::DecodeError> {
+    fn decode(
+        &self,
+        encoded: &'encoded [u8],
+        offset: &mut usize,
+    ) -> Result<Self::Decoded, crate::error::DecodeError> {
         let flag = BoolCodec.decode(encoded, offset)?;
         if flag {
             Ok(StdOption::None)
@@ -355,7 +471,12 @@ where
 {
     type Decoded = StdOption<Item::Decoded>;
 
-    fn encode(&self, decoded: &Self::Decoded, encoded: &mut [u8], offset: &mut usize) -> Result<(), crate::error::EncodeError> {
+    fn encode(
+        &self,
+        decoded: &Self::Decoded,
+        encoded: &mut [u8],
+        offset: &mut usize,
+    ) -> Result<(), crate::error::EncodeError> {
         match decoded {
             StdOption::None => {
                 BoolCodec.encode(&true, encoded, offset)?;
@@ -379,10 +500,7 @@ where
     fn measure(&self, decoded: &Self::Decoded) -> Result<usize, crate::error::EncodeError> {
         Ok(match decoded {
             StdOption::None => BoolCodec.measure(&true)?,
-            StdOption::Some(item) => {
-                BoolCodec.measure(&false)?
-                + self.item.measure(item)?
-            }
+            StdOption::Some(item) => BoolCodec.measure(&false)? + self.item.measure(item)?,
         })
     }
 }
@@ -393,9 +511,7 @@ pub struct BytesCodec<Length> {
 
 impl<Length> BytesCodec<Length> {
     pub const fn new(length: Length) -> Self {
-        Self {
-            length,
-        }
+        Self { length }
     }
 }
 
@@ -408,8 +524,16 @@ where
 {
     type Decoded = &'decoded [u8];
 
-    fn decode(&self, encoded: &'encoded [u8], offset: &mut usize) -> Result<Self::Decoded, crate::error::DecodeError> {
-        let size = self.length.decode(encoded, offset)?.try_into().map_err(Into::into)?;
+    fn decode(
+        &self,
+        encoded: &'encoded [u8],
+        offset: &mut usize,
+    ) -> Result<Self::Decoded, crate::error::DecodeError> {
+        let size = self
+            .length
+            .decode(encoded, offset)?
+            .try_into()
+            .map_err(Into::into)?;
         if *offset + size > encoded.len() {
             return Err(crate::error::DecodeError::InvalidData);
         }
@@ -427,9 +551,15 @@ where
 {
     type Decoded = [u8];
 
-    fn encode(&self, decoded: &Self::Decoded, encoded: &mut [u8], offset: &mut usize) -> Result<(), crate::error::EncodeError> {
+    fn encode(
+        &self,
+        decoded: &Self::Decoded,
+        encoded: &mut [u8],
+        offset: &mut usize,
+    ) -> Result<(), crate::error::EncodeError> {
         let size = decoded.len();
-        self.length.encode(&size.try_into().map_err(Into::into)?, encoded, offset)?;
+        self.length
+            .encode(&size.try_into().map_err(Into::into)?, encoded, offset)?;
         let end = *offset + size;
         if end > encoded.len() {
             return Err(crate::error::EncodeError::BufferTooSmall);

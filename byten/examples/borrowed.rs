@@ -1,6 +1,6 @@
 use std::ffi::CStr;
 
-use byten::{Decode, DefaultCodec, Encode, Measure, EncodeToVec as _};
+use byten::{Decode, DefaultCodec, Encode, EncodeToVec as _, Measure};
 
 #[derive(Debug, DefaultCodec, Encode, Decode, Measure)]
 pub struct Person<'encoded> {

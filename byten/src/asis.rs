@@ -4,7 +4,11 @@ pub struct U8Codec;
 
 impl Decoder<'_, '_> for U8Codec {
     type Decoded = u8;
-    fn decode(&self, encoded: &[u8], offset: &mut usize) -> Result<Self::Decoded, error::DecodeError> {
+    fn decode(
+        &self,
+        encoded: &[u8],
+        offset: &mut usize,
+    ) -> Result<Self::Decoded, error::DecodeError> {
         if *offset + 1 > encoded.len() {
             return Err(error::DecodeError::EOF);
         }
@@ -16,7 +20,12 @@ impl Decoder<'_, '_> for U8Codec {
 
 impl Encoder for U8Codec {
     type Decoded = u8;
-    fn encode(&self, decoded: &Self::Decoded, encoded: &mut [u8], offset: &mut usize) -> Result<(), error::EncodeError> {
+    fn encode(
+        &self,
+        decoded: &Self::Decoded,
+        encoded: &mut [u8],
+        offset: &mut usize,
+    ) -> Result<(), error::EncodeError> {
         if *offset + 1 > encoded.len() {
             return Err(error::EncodeError::BufferTooSmall);
         }
@@ -27,7 +36,9 @@ impl Encoder for U8Codec {
 }
 
 impl FixedMeasurer for U8Codec {
-    fn measure_fixed(&self) -> usize { 1 }
+    fn measure_fixed(&self) -> usize {
+        1
+    }
 }
 
 impl Measurer for U8Codec {
@@ -41,7 +52,11 @@ pub struct I8Codec;
 
 impl Decoder<'_, '_> for I8Codec {
     type Decoded = i8;
-    fn decode(&self, encoded: &[u8], offset: &mut usize) -> Result<Self::Decoded, error::DecodeError> {
+    fn decode(
+        &self,
+        encoded: &[u8],
+        offset: &mut usize,
+    ) -> Result<Self::Decoded, error::DecodeError> {
         if *offset + 1 > encoded.len() {
             return Err(error::DecodeError::EOF);
         }
@@ -53,7 +68,12 @@ impl Decoder<'_, '_> for I8Codec {
 
 impl Encoder for I8Codec {
     type Decoded = i8;
-    fn encode(&self, decoded: &Self::Decoded, encoded: &mut [u8], offset: &mut usize) -> Result<(), error::EncodeError> {
+    fn encode(
+        &self,
+        decoded: &Self::Decoded,
+        encoded: &mut [u8],
+        offset: &mut usize,
+    ) -> Result<(), error::EncodeError> {
         if *offset + 1 > encoded.len() {
             return Err(error::EncodeError::BufferTooSmall);
         }
@@ -64,7 +84,9 @@ impl Encoder for I8Codec {
 }
 
 impl FixedMeasurer for I8Codec {
-    fn measure_fixed(&self) -> usize { 1 }
+    fn measure_fixed(&self) -> usize {
+        1
+    }
 }
 
 impl Measurer for I8Codec {
@@ -78,20 +100,31 @@ pub struct U8ArrayCodec<const N: usize>;
 
 impl<const N: usize> Decoder<'_, '_> for U8ArrayCodec<N> {
     type Decoded = [u8; N];
-    fn decode(&self, encoded: &[u8], offset: &mut usize) -> Result<Self::Decoded, error::DecodeError> {
+    fn decode(
+        &self,
+        encoded: &[u8],
+        offset: &mut usize,
+    ) -> Result<Self::Decoded, error::DecodeError> {
         U8ArrayRefCodec::<N>.decode(encoded, offset).copied()
     }
 }
 
 impl<const N: usize> Encoder for U8ArrayCodec<N> {
     type Decoded = [u8; N];
-    fn encode(&self, decoded: &Self::Decoded, encoded: &mut [u8], offset: &mut usize) -> Result<(), error::EncodeError> {
+    fn encode(
+        &self,
+        decoded: &Self::Decoded,
+        encoded: &mut [u8],
+        offset: &mut usize,
+    ) -> Result<(), error::EncodeError> {
         U8ArrayRefCodec::<N>.encode(decoded, encoded, offset)
     }
 }
 
 impl<const N: usize> FixedMeasurer for U8ArrayCodec<N> {
-    fn measure_fixed(&self) -> usize { N }
+    fn measure_fixed(&self) -> usize {
+        N
+    }
 }
 
 impl<const N: usize> Measurer for U8ArrayCodec<N> {
@@ -103,9 +136,15 @@ impl<const N: usize> Measurer for U8ArrayCodec<N> {
 
 pub struct U8ArrayRefCodec<const N: usize>;
 
-impl<'encoded: 'decoded, 'decoded, const N: usize> Decoder<'encoded, 'decoded> for U8ArrayRefCodec<N> {
+impl<'encoded: 'decoded, 'decoded, const N: usize> Decoder<'encoded, 'decoded>
+    for U8ArrayRefCodec<N>
+{
     type Decoded = &'decoded [u8; N];
-    fn decode(&self, encoded: &'encoded [u8], offset: &mut usize) -> Result<Self::Decoded, error::DecodeError> {
+    fn decode(
+        &self,
+        encoded: &'encoded [u8],
+        offset: &mut usize,
+    ) -> Result<Self::Decoded, error::DecodeError> {
         if *offset + N > encoded.len() {
             return Err(error::DecodeError::EOF);
         }
@@ -117,7 +156,12 @@ impl<'encoded: 'decoded, 'decoded, const N: usize> Decoder<'encoded, 'decoded> f
 
 impl<const N: usize> Encoder for U8ArrayRefCodec<N> {
     type Decoded = [u8; N];
-    fn encode(&self, decoded: &Self::Decoded, encoded: &mut [u8], offset: &mut usize) -> Result<(), error::EncodeError> {
+    fn encode(
+        &self,
+        decoded: &Self::Decoded,
+        encoded: &mut [u8],
+        offset: &mut usize,
+    ) -> Result<(), error::EncodeError> {
         if *offset + N > encoded.len() {
             return Err(error::EncodeError::BufferTooSmall);
         }
@@ -128,7 +172,9 @@ impl<const N: usize> Encoder for U8ArrayRefCodec<N> {
 }
 
 impl<const N: usize> FixedMeasurer for U8ArrayRefCodec<N> {
-    fn measure_fixed(&self) -> usize { N }
+    fn measure_fixed(&self) -> usize {
+        N
+    }
 }
 
 impl<const N: usize> Measurer for U8ArrayRefCodec<N> {
@@ -142,7 +188,11 @@ pub struct BoolCodec;
 
 impl Decoder<'_, '_> for BoolCodec {
     type Decoded = bool;
-    fn decode(&self, encoded: &[u8], offset: &mut usize) -> Result<Self::Decoded, error::DecodeError> {
+    fn decode(
+        &self,
+        encoded: &[u8],
+        offset: &mut usize,
+    ) -> Result<Self::Decoded, error::DecodeError> {
         let byte = U8Codec.decode(encoded, offset)?;
         match byte {
             0 => Ok(false),
@@ -154,16 +204,27 @@ impl Decoder<'_, '_> for BoolCodec {
 
 impl Encoder for BoolCodec {
     type Decoded = bool;
-    fn encode(&self, decoded: &Self::Decoded, encoded: &mut [u8], offset: &mut usize) -> Result<(), error::EncodeError> {
-        U8Codec.encode(&match decoded {
-            false => 0u8,
-            true => 1u8,
-        }, encoded, offset)
+    fn encode(
+        &self,
+        decoded: &Self::Decoded,
+        encoded: &mut [u8],
+        offset: &mut usize,
+    ) -> Result<(), error::EncodeError> {
+        U8Codec.encode(
+            &match decoded {
+                false => 0u8,
+                true => 1u8,
+            },
+            encoded,
+            offset,
+        )
     }
 }
 
 impl FixedMeasurer for BoolCodec {
-    fn measure_fixed(&self) -> usize { 1 }
+    fn measure_fixed(&self) -> usize {
+        1
+    }
 }
 
 impl Measurer for BoolCodec {
@@ -181,7 +242,11 @@ where
     T: 'decoded,
 {
     type Decoded = Box<T>;
-    fn decode(&self, encoded: &'encoded [u8], offset: &mut usize) -> Result<Self::Decoded, error::DecodeError> {
+    fn decode(
+        &self,
+        encoded: &'encoded [u8],
+        offset: &mut usize,
+    ) -> Result<Self::Decoded, error::DecodeError> {
         let decoded = self.0.decode(encoded, offset)?;
         Ok(Box::new(decoded))
     }
@@ -192,7 +257,12 @@ where
     Codec: Encoder<Decoded = T>,
 {
     type Decoded = Box<T>;
-    fn encode(&self, decoded: &Self::Decoded, encoded: &mut [u8], offset: &mut usize) -> Result<(), error::EncodeError> {
+    fn encode(
+        &self,
+        decoded: &Self::Decoded,
+        encoded: &mut [u8],
+        offset: &mut usize,
+    ) -> Result<(), error::EncodeError> {
         self.0.encode(decoded.as_ref(), encoded, offset)
     }
 }

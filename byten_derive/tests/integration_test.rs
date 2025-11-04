@@ -1,4 +1,4 @@
-use byten::{ DefaultCodec, DecodeOwned, Encode, Measure, MeasureFixed };
+use byten::{DecodeOwned, DefaultCodec, Encode, Measure, MeasureFixed};
 
 #[derive(Debug, PartialEq, Eq, DefaultCodec, DecodeOwned, Encode, Measure)]
 struct Person {
@@ -30,10 +30,7 @@ enum Color {
     Red = 1,
     Green = 2,
     Blue = 3,
-    Grayscale(
-        #[byten($be)]
-        u16
-    ) = 4,
+    Grayscale(#[byten($be)] u16) = 4,
     RGBa {
         red: u8,
         green: u8,
@@ -41,11 +38,8 @@ enum Color {
         #[byten($be)]
         alpha: u16,
     } = 5,
-    Gradient(Box::<Color>, Box::<Color>) = 6,
-    ColorCode(
-        #[byten($be)]
-        u64
-    ) = 7,
+    Gradient(Box<Color>, Box<Color>) = 6,
+    ColorCode(#[byten($be)] u64) = 7,
     Unknown() = 255,
 }
 
@@ -54,7 +48,7 @@ mod test {
     use byten::{Decode as _, EncodeToVec as _};
 
     use super::*;
-    
+
     #[test]
     fn test_person_codec() {
         let person = Person {
@@ -82,43 +76,31 @@ mod test {
 
         let expected_encoded = vec![
             0x00, 0x01, 0xe2, 0x40, // id: U32BE(123456)
-
-            0x05,                   // name length: var::USizeBE(5)
+            0x05, // name length: var::USizeBE(5)
             0x41, 0x6c, 0x69, 0x63, 0x65, // name: "Alice"
-
-            23,                     // birthday.day: u8(23)
-            10,                     // birthday.month: u8(10)
-            0x07, 0xAD,             // birthday.year: U16BE(1965)
-
-            0b00000110,             // favorite_colors length: var::USizeBE(6)
-
-            0x01, 0x00,             // Color::Red discriminant: U16LE(1)
-
-            0x04, 0x00,             // Color::Grayscale discriminant: U16LE(4)
-            0x00, 0x80,             // Grayscale value: U16BE(128)
-
-            0x05, 0x00,             // Color::RGBa discriminant: U16LE(5)
-            0xff, 0x00, 0x00,       // RGB values
-            0xff, 0xff,             // alpha: U16BE(65535)
-
-            0x06, 0x00,             // Color::Gradient discriminant: U16LE(6)
-
-            0x02, 0x00,             // Color::Green discriminant: U16LE(2)
-
-            0x03, 0x00,             // Color::Blue discriminant: U16LE(3)
-
-            0x07, 0x00,             // Color::ColorCode discriminant: U16LE(7);
-
+            23,   // birthday.day: u8(23)
+            10,   // birthday.month: u8(10)
+            0x07, 0xAD,       // birthday.year: U16BE(1965)
+            0b00000110, // favorite_colors length: var::USizeBE(6)
+            0x01, 0x00, // Color::Red discriminant: U16LE(1)
+            0x04, 0x00, // Color::Grayscale discriminant: U16LE(4)
+            0x00, 0x80, // Grayscale value: U16BE(128)
+            0x05, 0x00, // Color::RGBa discriminant: U16LE(5)
+            0xff, 0x00, 0x00, // RGB values
+            0xff, 0xff, // alpha: U16BE(65535)
+            0x06, 0x00, // Color::Gradient discriminant: U16LE(6)
+            0x02, 0x00, // Color::Green discriminant: U16LE(2)
+            0x03, 0x00, // Color::Blue discriminant: U16LE(3)
+            0x07, 0x00, // Color::ColorCode discriminant: U16LE(7);
             // Color::ColorCode value: U64BE(0b110010101010)
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // padding for U64BE
             0b1100, 0b10101010, // full bytes
-
-            0xff, 0x00,          // Color::Unknown discriminant: U16LE(255)
+            0xff, 0x00, // Color::Unknown discriminant: U16LE(255)
         ];
-        
+
         let size = person.measure().expect("Measuring failed");
         assert_eq!(size, expected_encoded.len());
-        
+
         let encoded = person.encode_to_vec().expect("Encoding failed");
         assert_eq!(encoded, expected_encoded);
         let decoded = Person::decode(&encoded, &mut 0).expect("Decoding failed");

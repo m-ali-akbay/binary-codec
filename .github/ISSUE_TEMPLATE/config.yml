@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://docs.rs/byten
+    about: Read the official documentation for byten
+  - name: Discussions
+    url: https://github.com/m-ali-akbay/byten/discussions
+    about: Ask questions and discuss ideas with the community

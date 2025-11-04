@@ -1,7 +1,10 @@
-use crate::{error::DecodeError, Decoder, DefaultCodec, error::EncodeError, Encoder, Measurer};
+use crate::{Decoder, DefaultCodec, Encoder, Measurer, error::DecodeError, error::EncodeError};
 
 pub trait DecodeDefault<'encoded>: Sized {
-    fn decode(encoded: &'encoded [u8], offset: &mut usize) -> Result<Self, crate::error::DecodeError>;
+    fn decode(
+        encoded: &'encoded [u8],
+        offset: &mut usize,
+    ) -> Result<Self, crate::error::DecodeError>;
 }
 
 impl<'encoded, 'decoded, T> DecodeDefault<'encoded> for T
@@ -21,8 +24,8 @@ pub trait EncodeDefault {
 
 impl<T, Codec> EncodeDefault for T
 where
-    T: DefaultCodec<Codec=Codec> + ?Sized,
-    Codec: Encoder<Decoded=T>,
+    T: DefaultCodec<Codec = Codec> + ?Sized,
+    Codec: Encoder<Decoded = T>,
 {
     fn encode(&self, encoded: &mut [u8], offset: &mut usize) -> Result<(), EncodeError> {
         let codec = T::default_codec();
@@ -31,13 +34,13 @@ where
 }
 
 pub trait EncodeToVec {
-  fn encode_to_vec(&self) -> Result<Vec<u8>, EncodeError>;
+    fn encode_to_vec(&self) -> Result<Vec<u8>, EncodeError>;
 }
 
 impl<T, Codec> EncodeToVec for T
-where 
-    T: DefaultCodec<Codec=Codec> + ?Sized,
-    Codec: Encoder<Decoded=T> + Measurer<Decoded=T>,
+where
+    T: DefaultCodec<Codec = Codec> + ?Sized,
+    Codec: Encoder<Decoded = T> + Measurer<Decoded = T>,
 {
     fn encode_to_vec(&self) -> Result<Vec<u8>, EncodeError> {
         let codec = Self::default_codec();
@@ -54,7 +57,9 @@ pub trait EncoderToVec {
     fn encode_to_vec(&self, decoded: &Self::Decoded) -> Result<Vec<u8>, EncodeError>;
 }
 
-impl<Decoded: ?Sized, C: Encoder<Decoded=Decoded> + Measurer<Decoded=Decoded>> EncoderToVec for C {
+impl<Decoded: ?Sized, C: Encoder<Decoded = Decoded> + Measurer<Decoded = Decoded>> EncoderToVec
+    for C
+{
     type Decoded = Decoded;
     fn encode_to_vec(&self, decoded: &Self::Decoded) -> Result<Vec<u8>, crate::error::EncodeError> {
         let size = self.measure(decoded)?;

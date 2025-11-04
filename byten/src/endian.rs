@@ -20,7 +20,10 @@ pub struct EndianCodec<T> {
 
 impl<T> EndianCodec<T> {
     pub const fn new(endianness: Endianness) -> Self {
-        Self { endianness, _marker: PhantomData }
+        Self {
+            endianness,
+            _marker: PhantomData,
+        }
     }
 
     pub const fn le() -> Self {
@@ -38,16 +41,13 @@ impl<'decoded, T: EndianCoded + 'decoded> crate::Decoder<'_, 'decoded> for Endia
     fn decode(
         &self,
         encoded: &'_ [u8],
-        offset: &mut usize
+        offset: &mut usize,
     ) -> Result<Self::Decoded, crate::DecodeError> {
         let length = T::length();
         if *offset + length > encoded.len() {
             return Err(crate::DecodeError::EOF);
         }
-        let value = T::decode(
-            self.endianness,
-            &encoded[*offset..*offset + length],
-        );
+        let value = T::decode(self.endianness, &encoded[*offset..*offset + length]);
         *offset += length;
         Ok(value)
     }
@@ -60,16 +60,13 @@ impl<T: EndianCoded> crate::Encoder for EndianCodec<T> {
         &self,
         decoded: &Self::Decoded,
         encoded: &mut [u8],
-        offset: &mut usize
+        offset: &mut usize,
     ) -> Result<(), crate::EncodeError> {
         let length = T::length();
         if *offset + length > encoded.len() {
             return Err(crate::EncodeError::BufferTooSmall);
         }
-        decoded.encode(
-            self.endianness,
-            &mut encoded[*offset..*offset + length],
-        );
+        decoded.encode(self.endianness, &mut encoded[*offset..*offset + length]);
         *offset += length;
         Ok(())
     }
@@ -114,9 +111,4 @@ macro_rules! impl_endian_coded {
     };
 }
 
-impl_endian_coded!(
-    u16, i16,
-    u32, i32,
-    u64, i64,
-    u128, i128,
-);
+impl_endian_coded!(u16, i16, u32, i32, u64, i64, u128, i128,);

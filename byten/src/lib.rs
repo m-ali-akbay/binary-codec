@@ -11,7 +11,7 @@ mod var;
 use std::{ffi::CStr, ops::Deref};
 
 #[cfg(feature = "derive")]
-pub use byten_derive::{byten, DefaultCodec, Decode, DecodeOwned, Encode, Measure, MeasureFixed};
+pub use byten_derive::{Decode, DecodeOwned, DefaultCodec, Encode, Measure, MeasureFixed, byten};
 
 #[doc(inline)]
 pub use array::*;
@@ -32,21 +32,20 @@ pub use util::*;
 #[doc(inline)]
 pub use var::*;
 
-
 // codec traits
 
 /// A codec that can encode values of type `Decoded` into a byte slice.
 /// It returns a result indicating success or failure but never panics.
-/// 
+///
 /// It takes a reference to the value to be encoded, a mutable byte slice to write the encoded data into and an offset
 /// indicating the current position in the byte slice.
 /// The offset is updated to point to the next position after the encoded data.
-/// 
+///
 /// # Examples
 /// ## Simple u32-big-endian encoder
 /// ```
 /// use byten::{Encoder, EncodeError};
-/// 
+///
 /// // Define a simple encoder for u32 in big-endian format
 /// struct U32BigEndianCodec;
 /// impl Encoder for U32BigEndianCodec {
@@ -67,7 +66,7 @@ pub use var::*;
 ///         Ok(())
 ///     }
 /// }
-/// 
+///
 /// let codec = U32BigEndianCodec;
 /// let mut buffer = [0xFFu8; 6];
 /// let mut offset = 1; // start encoding into at index 1
@@ -81,7 +80,12 @@ pub use var::*;
 /// ```
 pub trait Encoder {
     type Decoded: ?Sized;
-    fn encode(&self, decoded: &Self::Decoded, encoded: &mut [u8], offset: &mut usize) -> Result<(), error::EncodeError>;
+    fn encode(
+        &self,
+        decoded: &Self::Decoded,
+        encoded: &mut [u8],
+        offset: &mut usize,
+    ) -> Result<(), error::EncodeError>;
 }
 
 impl<T, Ref> Encoder for Ref
@@ -90,18 +94,23 @@ where
     Ref: Deref<Target = T>,
 {
     type Decoded = T::Decoded;
-    fn encode(&self, decoded: &Self::Decoded, encoded: &mut [u8], offset: &mut usize) -> Result<(), error::EncodeError> {
+    fn encode(
+        &self,
+        decoded: &Self::Decoded,
+        encoded: &mut [u8],
+        offset: &mut usize,
+    ) -> Result<(), error::EncodeError> {
         self.deref().encode(decoded, encoded, offset)
     }
 }
 
 /// A codec that can decode values of type `Decoded` from a byte slice.
 /// It returns a result containing the decoded value or an error if decoding fails.
-/// 
+///
 /// It takes a byte slice containing the encoded data and a mutable offset indicating the current position in
 /// the byte slice.
 /// The offset is updated to point to the next position after the decoded data.
-/// 
+///
 /// The decoded value has a lifetime tied to the lifetime of the encoded byte slice.
 /// It is important to ensure that the byte slice remains valid for the duration of the decoded value's usage.
 /// This is not relevant for types that own their data (e.g., `Vec<u8>`, `String`), but is crucial for
@@ -111,7 +120,7 @@ where
 /// ## Owned decoded value
 /// ```
 /// use byten::{Decoder, DecodeError};
-/// 
+///
 /// // Define a simple decoder for u32 in big-endian format
 /// struct U32BigEndianCodec;
 /// impl Decoder<'_, '_> for U32BigEndianCodec {
@@ -133,7 +142,7 @@ where
 ///         Ok(value)
 ///     }
 /// }
-/// 
+///
 /// let codec = U32BigEndianCodec;
 /// let buffer = [0xFFu8, 0x12, 0x34, 0x56, 0x78, 0xFF];
 /// let mut offset = 1; // start decoding from index 1
@@ -141,11 +150,11 @@ where
 /// assert_eq!(value, 0x12345678);
 /// assert_eq!(offset, 5); // offset updated correctly
 /// ```
-/// 
+///
 /// ## Borrowed decoded value
 /// ```
 /// use byten::{Decoder, DecodeError};
-/// 
+///
 /// // Define a simple decoder for &str assuming UTF-8 encoding
 /// struct StrCodec;
 /// impl<'encoded: 'decoded, 'decoded> Decoder<'encoded, 'decoded> for StrCodec {
@@ -162,7 +171,7 @@ where
 ///         Ok(s)
 ///     }
 /// }
-/// 
+///
 /// let codec = StrCodec;
 /// let buffer = [b'H', b'e', b'l', b'l', b'o', 0, b'W', b'o', b'r', b'l', b'd', b'!', 0];
 /// let mut offset = 0;
@@ -175,7 +184,11 @@ where
 /// ```
 pub trait Decoder<'encoded, 'decoded> {
     type Decoded: 'decoded;
-    fn decode(&self, encoded: &'encoded [u8], offset: &mut usize) -> Result<Self::Decoded, error::DecodeError>;
+    fn decode(
+        &self,
+        encoded: &'encoded [u8],
+        offset: &mut usize,
+    ) -> Result<Self::Decoded, error::DecodeError>;
 }
 
 impl<'encoded, 'decoded, T, Ref> Decoder<'encoded, 'decoded> for Ref
@@ -184,25 +197,29 @@ where
     Ref: Deref<Target = T>,
 {
     type Decoded = T::Decoded;
-    fn decode(&self, encoded: &'encoded [u8], offset: &mut usize) -> Result<Self::Decoded, error::DecodeError> {
+    fn decode(
+        &self,
+        encoded: &'encoded [u8],
+        offset: &mut usize,
+    ) -> Result<Self::Decoded, error::DecodeError> {
         self.deref().decode(encoded, offset)
     }
 }
 
 /// A codec that can measure the size in bytes required to encode a value of type `Decoded`.
 /// It returns a result containing the size in bytes or an error if measurement fails.
-/// 
+///
 /// It takes a reference to the value to be measured.
-/// 
+///
 /// This is particularly useful for types with variable-length encoding
 /// where the size cannot be determined statically.
 /// This is also useful for pre-allocating buffers of the correct size before encoding.
-/// 
+///
 /// # Examples
 /// ## Simple variable-length string measurer
 /// ```
 /// use byten::{Measurer, EncodeError};
-/// 
+///
 /// // Define a simple measurer for strings that encodes the length as a u8 prefix
 /// struct VarLenStrMeasurer;
 /// impl Measurer for VarLenStrMeasurer {
@@ -239,21 +256,21 @@ where
 /// A codec that can measure the size in bytes required to encode a value of type `Decoded`
 /// where the size is fixed and does not depend on the actual value.
 /// It provides a method to get the fixed size directly without needing a value.
-/// 
+///
 /// It is expected to return the same size for any value of type `Decoded`
 /// unless the internal configuration of the codec changes.
 ///
 /// This is particularly useful for types with fixed-length encoding
 /// where the size is known at compile time.
-/// 
+///
 /// This can improve performance by avoiding the need to pass a value
 /// when the size is constant by allowing the compiler to optimize for it.
-/// 
+///
 /// # Examples
 /// ## Simple fixed-length u32 measurer
 /// ```
 /// use byten::{FixedMeasurer, Measurer, EncodeError};
-/// 
+///
 /// // Define a simple fixed-length measurer for u32
 /// struct U32FixedMeasurer;
 /// impl FixedMeasurer for U32FixedMeasurer {
@@ -262,7 +279,7 @@ where
 ///     }
 /// }
 ///
-/// // FixedMeasurer also requires Measurer implementation 
+/// // FixedMeasurer also requires Measurer implementation
 /// impl Measurer for U32FixedMeasurer {
 ///    type Decoded = u32;
 ///    fn measure(&self, _decoded: &Self::Decoded) -> Result<usize, EncodeError> {
@@ -294,22 +311,22 @@ where
 /// A trait for types that have a default codec associated with them.
 /// This allows for easy retrieval of the default codec for a type
 /// without needing to specify the codec explicitly each time.
-/// 
+///
 /// # Examples
 /// ```
 /// use byten::{DefaultCodec, U8Codec};
-/// 
+///
 /// struct MyType {
 ///     // ..
 /// };
-/// 
+///
 /// struct MyCodec;
-/// 
+///
 /// impl DefaultCodec for MyType {
 ///     type Codec = MyCodec;
 ///     fn default_codec() -> Self::Codec { MyCodec }
 /// }
-/// 
+///
 /// let codec = MyType::default_codec();
 /// // codec is of type MyCodec
 /// ```
@@ -322,27 +339,37 @@ pub trait DefaultCodec {
 
 impl DefaultCodec for u8 {
     type Codec = U8Codec;
-    fn default_codec() -> Self::Codec { U8Codec }
+    fn default_codec() -> Self::Codec {
+        U8Codec
+    }
 }
 
 impl DefaultCodec for i8 {
     type Codec = I8Codec;
-    fn default_codec() -> Self::Codec { I8Codec }
+    fn default_codec() -> Self::Codec {
+        I8Codec
+    }
 }
 
 impl<const N: usize> DefaultCodec for [u8; N] {
     type Codec = U8ArrayCodec<N>;
-    fn default_codec() -> Self::Codec { U8ArrayCodec }
+    fn default_codec() -> Self::Codec {
+        U8ArrayCodec
+    }
 }
 
 impl<const N: usize> DefaultCodec for &[u8; N] {
     type Codec = U8ArrayRefCodec<N>;
-    fn default_codec() -> Self::Codec { U8ArrayRefCodec::<N> }
+    fn default_codec() -> Self::Codec {
+        U8ArrayRefCodec::<N>
+    }
 }
 
 impl DefaultCodec for bool {
     type Codec = BoolCodec;
-    fn default_codec() -> Self::Codec { BoolCodec }
+    fn default_codec() -> Self::Codec {
+        BoolCodec
+    }
 }
 
 impl<T> DefaultCodec for Box<T>

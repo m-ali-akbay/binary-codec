@@ -1,6 +1,12 @@
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use syn::{Attribute, Expr, Ident, Meta, Token, Type, parse::{ParseStream, Parser}, parse_quote, spanned::Spanned, token::Brace};
+use syn::{
+    Attribute, Expr, Ident, Meta, Token, Type,
+    parse::{ParseStream, Parser},
+    parse_quote,
+    spanned::Spanned,
+    token::Brace,
+};
 
 use super::{BinarySchema, DecodeContext, EncodeContext, MeasureContext};
 
@@ -40,7 +46,10 @@ trait Operand {
     fn span(&self) -> Span;
     fn codec(&self) -> Expr;
     fn typ(&self) -> syn::Result<Type> {
-        Err(syn::Error::new(self.span(), "Operand does not support type extraction"))
+        Err(syn::Error::new(
+            self.span(),
+            "Operand does not support type extraction",
+        ))
     }
 }
 
@@ -49,7 +58,9 @@ struct DefaultOperand {
 }
 
 impl Operand for DefaultOperand {
-    fn span(&self) -> Span { self.span }
+    fn span(&self) -> Span {
+        self.span
+    }
 
     fn codec(&self) -> Expr {
         parse_quote! { ::byten::DefaultCodec::default_codec() }
@@ -62,7 +73,9 @@ struct TypeOperand {
 }
 
 impl Operand for TypeOperand {
-    fn span(&self) -> Span { self.span }
+    fn span(&self) -> Span {
+        self.span
+    }
 
     fn codec(&self) -> Expr {
         let ty = &self.typ;
@@ -91,10 +104,10 @@ impl Operand for EndianOperand {
         match self {
             EndianOperand::Big(_, ty) => {
                 parse_quote! { ::byten::EndianCodec::<#ty>::new(::byten::Endianness::Big) }
-            },
+            }
             EndianOperand::Little(_, ty) => {
                 parse_quote! { ::byten::EndianCodec::<#ty>::new(::byten::Endianness::Little) }
-            },
+            }
         }
     }
 }
@@ -106,7 +119,9 @@ struct VecOperand {
 }
 
 impl Operand for VecOperand {
-    fn span(&self) -> Span { self.span }
+    fn span(&self) -> Span {
+        self.span
+    }
 
     fn codec(&self) -> Expr {
         let item_codec = self.item.codec();
@@ -121,7 +136,9 @@ struct OwnOperand {
 }
 
 impl Operand for OwnOperand {
-    fn span(&self) -> Span { self.span }
+    fn span(&self) -> Span {
+        self.span
+    }
 
     fn codec(&self) -> Expr {
         let base = self.base.codec();
@@ -135,7 +152,9 @@ struct OptOperand {
 }
 
 impl Operand for OptOperand {
-    fn span(&self) -> Span { self.span }
+    fn span(&self) -> Span {
+        self.span
+    }
 
     fn codec(&self) -> Expr {
         let base = self.base.codec();
@@ -149,7 +168,9 @@ struct UTF8Operand {
 }
 
 impl Operand for UTF8Operand {
-    fn span(&self) -> Span { self.span }
+    fn span(&self) -> Span {
+        self.span
+    }
 
     fn codec(&self) -> Expr {
         let base = self.base.codec();
@@ -163,7 +184,9 @@ struct CodecOperand {
 }
 
 impl Operand for CodecOperand {
-    fn span(&self) -> Span { self.span }
+    fn span(&self) -> Span {
+        self.span
+    }
 
     fn codec(&self) -> Expr {
         self.codec.clone()
@@ -176,7 +199,9 @@ struct UVarBEOperand {
 }
 
 impl Operand for UVarBEOperand {
-    fn span(&self) -> Span { self.span }
+    fn span(&self) -> Span {
+        self.span
+    }
 
     fn codec(&self) -> Expr {
         let ty = &self.typ;
@@ -190,7 +215,9 @@ struct BytesOperand {
 }
 
 impl Operand for BytesOperand {
-    fn span(&self) -> Span { self.span }
+    fn span(&self) -> Span {
+        self.span
+    }
 
     fn codec(&self) -> Expr {
         let length_codec = self.length.codec();
@@ -203,7 +230,9 @@ struct RemainingOperand {
 }
 
 impl Operand for RemainingOperand {
-    fn span(&self) -> Span { self.span }
+    fn span(&self) -> Span {
+        self.span
+    }
     fn codec(&self) -> Expr {
         parse_quote! { ::byten::RemainingCodec::new() }
     }
@@ -215,7 +244,9 @@ struct ArrOperand {
 }
 
 impl Operand for ArrOperand {
-    fn span(&self) -> Span { self.span }
+    fn span(&self) -> Span {
+        self.span
+    }
 
     fn codec(&self) -> Expr {
         let item_codec = self.item.codec();
@@ -226,22 +257,32 @@ impl Operand for ArrOperand {
 pub fn build_codec_expr(tokens: TokenStream) -> syn::Result<Expr> {
     let span = tokens.span();
     let operand = Parser::parse2(
-        move |stream: ParseStream<'_>| build_codec_pipeline(stream, Box::new(DefaultOperand{ span })),
+        move |stream: ParseStream<'_>| {
+            build_codec_pipeline(stream, Box::new(DefaultOperand { span }))
+        },
         tokens,
     )?;
 
     Ok(operand.codec())
 }
 
-pub fn build_codec_schema(attr: &Vec<Attribute>, typ: Option<&Type>) -> syn::Result<Box<dyn BinarySchema>> {
+pub fn build_codec_schema(
+    attr: &Vec<Attribute>,
+    typ: Option<&Type>,
+) -> syn::Result<Box<dyn BinarySchema>> {
     let mut operand: Box<dyn Operand> = match typ {
-        Some(typ) => Box::new(TypeOperand { span: typ.span(), typ: typ.clone() }),
-        None => Box::new(DefaultOperand { span: Span::call_site() }),
+        Some(typ) => Box::new(TypeOperand {
+            span: typ.span(),
+            typ: typ.clone(),
+        }),
+        None => Box::new(DefaultOperand {
+            span: Span::call_site(),
+        }),
     };
 
     for attribute in attr {
         if !attribute.path().is_ident("byten") {
-            continue;   
+            continue;
         }
         match &attribute.meta {
             Meta::List(meta) => {
@@ -250,10 +291,13 @@ pub fn build_codec_schema(attr: &Vec<Attribute>, typ: Option<&Type>) -> syn::Res
                     move |stream: ParseStream<'_>| build_codec_pipeline(stream, operand),
                     tokens,
                 )?;
-            },
+            }
             _ => {
-                return Err(syn::Error::new(attribute.span(), "Invalid byten attribute format"));
-            },
+                return Err(syn::Error::new(
+                    attribute.span(),
+                    "Invalid byten attribute format",
+                ));
+            }
         }
     }
 
@@ -262,7 +306,10 @@ pub fn build_codec_schema(attr: &Vec<Attribute>, typ: Option<&Type>) -> syn::Res
     }))
 }
 
-fn build_codec_pipeline(stream: ParseStream, mut operand: Box<dyn Operand>) -> Result<Box<dyn Operand>, syn::Error> {
+fn build_codec_pipeline(
+    stream: ParseStream,
+    mut operand: Box<dyn Operand>,
+) -> Result<Box<dyn Operand>, syn::Error> {
     loop {
         operand = build_codec(stream, operand)?;
         if stream.is_empty() {
@@ -271,12 +318,18 @@ fn build_codec_pipeline(stream: ParseStream, mut operand: Box<dyn Operand>) -> R
     }
 }
 
-fn build_codec(stream: ParseStream, operand: Box<dyn Operand>) -> Result<Box<dyn Operand>, syn::Error> {
+fn build_codec(
+    stream: ParseStream,
+    operand: Box<dyn Operand>,
+) -> Result<Box<dyn Operand>, syn::Error> {
     if stream.peek(Brace) {
         let content;
         syn::braced!(content in stream);
         let expr: Expr = content.parse()?;
-        return Ok(Box::new(CodecOperand { span: content.span(), codec: expr }));
+        return Ok(Box::new(CodecOperand {
+            span: content.span(),
+            codec: expr,
+        }));
     }
 
     if stream.peek(Token![..]) {
@@ -288,60 +341,82 @@ fn build_codec(stream: ParseStream, operand: Box<dyn Operand>) -> Result<Box<dyn
         let _dollar: Token![$] = stream.parse()?;
         let ident: Ident = stream.parse()?;
         return match ident.to_string().as_str() {
-            "own" => Ok(Box::new(OwnOperand { span: ident.span(), base: operand })),
+            "own" => Ok(Box::new(OwnOperand {
+                span: ident.span(),
+                base: operand,
+            })),
             "be" => Ok(Box::new(EndianOperand::Big(ident.span(), operand.typ()?))),
-            "le" => Ok(Box::new(EndianOperand::Little(ident.span(), operand.typ()?))),
-            "uvarbe" => Ok(Box::new(UVarBEOperand { span: ident.span(), typ: operand.typ()? })),
+            "le" => Ok(Box::new(EndianOperand::Little(
+                ident.span(),
+                operand.typ()?,
+            ))),
+            "uvarbe" => Ok(Box::new(UVarBEOperand {
+                span: ident.span(),
+                typ: operand.typ()?,
+            })),
             "bytes" => {
                 let content;
                 syn::bracketed!(content in stream);
-                let length = build_codec_pipeline(&content, Box::new(DefaultOperand{
-                    span: ident.span(),
-                }))?;
+                let length = build_codec_pipeline(
+                    &content,
+                    Box::new(DefaultOperand { span: ident.span() }),
+                )?;
                 Ok(Box::new(BytesOperand {
                     span: ident.span(),
                     length,
                 }))
-            },
+            }
             "vec" => {
                 let content;
                 syn::parenthesized!(content in stream);
-                let item = build_codec_pipeline(&content, Box::new(DefaultOperand{
-                    span: ident.span(),
-                }))?;
+                let item = build_codec_pipeline(
+                    &content,
+                    Box::new(DefaultOperand { span: ident.span() }),
+                )?;
 
                 let content;
                 syn::bracketed!(content in stream);
-                let length = build_codec_pipeline(&content, Box::new(DefaultOperand{
-                    span: ident.span(),
-                }))?;
+                let length = build_codec_pipeline(
+                    &content,
+                    Box::new(DefaultOperand { span: ident.span() }),
+                )?;
 
                 Ok(Box::new(VecOperand {
                     span: ident.span(),
                     item,
                     length,
                 }))
-            },
+            }
             "arr" => {
                 let content;
                 syn::bracketed!(content in stream);
-                let item = build_codec_pipeline(&content, Box::new(DefaultOperand{
-                    span: ident.span(),
-                }))?;
+                let item = build_codec_pipeline(
+                    &content,
+                    Box::new(DefaultOperand { span: ident.span() }),
+                )?;
                 Ok(Box::new(ArrOperand {
                     span: ident.span(),
                     item,
                 }))
-            },
-            "opt" => Ok(Box::new(OptOperand { span: ident.span(), base: operand })),
+            }
+            "opt" => Ok(Box::new(OptOperand {
+                span: ident.span(),
+                base: operand,
+            })),
             "utf8" => Ok(Box::new(UTF8Operand {
                 span: ident.span(),
                 base: operand,
             })),
-            _ => Err(syn::Error::new(ident.span(), format!("Unknown codec modifier: {}", ident))),
-        }
+            _ => Err(syn::Error::new(
+                ident.span(),
+                format!("Unknown codec modifier: {}", ident),
+            )),
+        };
     }
 
     let typ: Type = stream.parse()?;
-    Ok(Box::new(TypeOperand { span: stream.span(), typ }))
+    Ok(Box::new(TypeOperand {
+        span: stream.span(),
+        typ,
+    }))
 }

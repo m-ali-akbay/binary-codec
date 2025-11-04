@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
-use syn::{DeriveInput, parse_macro_input};
 use quote::quote;
+use syn::{DeriveInput, parse_macro_input};
 
 mod schema;
 use schema::*;
@@ -29,7 +29,8 @@ fn _derive_default_codec(input: DeriveInput) -> syn::Result<TokenStream> {
                 ::byten::SelfCoded::<Self>::new()
             }
         }
-    }.into())
+    }
+    .into())
 }
 
 #[proc_macro_derive(DefaultCodec, attributes(byten))]
@@ -57,7 +58,8 @@ fn _derive_decode_owned(input: DeriveInput) -> syn::Result<TokenStream> {
                 Ok(#decoded)
             }
         }
-    }.into())
+    }
+    .into())
 }
 
 #[proc_macro_derive(DecodeOwned, attributes(byten))]
@@ -144,7 +146,8 @@ fn _derive_measure(input: DeriveInput) -> syn::Result<TokenStream> {
                 Ok(#measured)
             }
         }
-    }.into())
+    }
+    .into())
 }
 
 #[proc_macro_derive(Measure, attributes(byten))]
@@ -183,5 +186,6 @@ fn _derive_measure_fixed(input: DeriveInput) -> syn::Result<TokenStream> {
                 Ok(Self::measure_fixed())
             }
         }
-    }.into())
+    }
+    .into())
 }

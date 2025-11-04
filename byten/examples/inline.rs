@@ -1,4 +1,4 @@
-use byten::{byten, Decoder, EncoderToVec as _};
+use byten::{Decoder, EncoderToVec as _, byten};
 
 fn main() {
     let codec = byten!( $bytes[u32 $be] $utf8 );

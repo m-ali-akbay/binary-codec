@@ -18,7 +18,11 @@ where
     <Codec::Decoded as Deref>::Target: ToOwned,
 {
     type Decoded = <<Codec::Decoded as Deref>::Target as ToOwned>::Owned;
-    fn decode(&self, encoded: &'encoded [u8], offset: &mut usize) -> Result<Self::Decoded, crate::DecodeError> {
+    fn decode(
+        &self,
+        encoded: &'encoded [u8],
+        offset: &mut usize,
+    ) -> Result<Self::Decoded, crate::DecodeError> {
         let borrowed = self.codec.decode(encoded, offset)?;
         Ok(borrowed.deref().to_owned())
     }

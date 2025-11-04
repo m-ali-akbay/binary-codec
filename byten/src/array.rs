@@ -1,4 +1,4 @@
-use crate::{error::DecodeError, Decoder, error::EncodeError, Encoder, FixedMeasurer, Measurer};
+use crate::{Decoder, Encoder, FixedMeasurer, Measurer, error::DecodeError, error::EncodeError};
 
 pub struct ArrayCodec<Item, const N: usize>(pub Item);
 
@@ -14,13 +14,21 @@ where
 {
     type Decoded = [Item::Decoded; N];
 
-    fn decode(&self, encoded: &'encoded [u8], offset: &mut usize) -> Result<Self::Decoded, DecodeError> {
+    fn decode(
+        &self,
+        encoded: &'encoded [u8],
+        offset: &mut usize,
+    ) -> Result<Self::Decoded, DecodeError> {
         let mut array: heapless::Vec<Item::Decoded, N> = heapless::Vec::new();
         for _ in 0..N {
             let item = self.0.decode(encoded, offset)?;
-            array.push(item).unwrap_or_else(|_| panic!("unexpected heapless vec overflow"));
+            array
+                .push(item)
+                .unwrap_or_else(|_| panic!("unexpected heapless vec overflow"));
         }
-        let array = array.into_array().unwrap_or_else(|_| panic!("unexpected heapless vec underflow"));
+        let array = array
+            .into_array()
+            .unwrap_or_else(|_| panic!("unexpected heapless vec underflow"));
         Ok(array)
     }
 }
@@ -32,7 +40,12 @@ where
 {
     type Decoded = [Item::Decoded; N];
 
-    fn encode(&self, decoded: &Self::Decoded, encoded: &mut [u8], offset: &mut usize) -> Result<(), EncodeError> {
+    fn encode(
+        &self,
+        decoded: &Self::Decoded,
+        encoded: &mut [u8],
+        offset: &mut usize,
+    ) -> Result<(), EncodeError> {
         for item in decoded.iter() {
             self.0.encode(item, encoded, offset)?;
         }

@@ -1,4 +1,4 @@
-use byten::{Decode, DecodeOwned, DefaultCodec, Encode, Measure, EncodeToVec as _};
+use byten::{Decode, DecodeOwned, DefaultCodec, Encode, EncodeToVec as _, Measure};
 
 #[derive(Debug, DefaultCodec, Encode, Measure, DecodeOwned)]
 pub struct Foo {
