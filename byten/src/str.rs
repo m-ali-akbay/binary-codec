@@ -1,12 +1,58 @@
 use std::ffi::CStr;
 
-pub struct UTF8Codec<Codec> {
-    pub codec: Codec,
-}
+/// A codec for UTF-8 encoded strings.
+///
+/// The inner codec is used to encode/decode/measure the underlying byte slice.
+///
+/// # Examples
+/// ## Fixed Size UTF-8 String
+/// ```rust
+/// use byten::{UTF8Codec, Encoder, Decoder, Measurer, FixedMeasurer, FixedU8SliceCodec, EncoderToVec as _};
+///
+/// let s: &str = "Hello, world!";
+/// let codec = UTF8Codec::new(FixedU8SliceCodec::new(13));
+///
+/// let encoded = codec.encode_to_vec(s).unwrap();
+/// assert_eq!(encoded.len(), 13);
+/// assert_eq!(encoded, b"Hello, world!");
+///
+/// let mut decode_offset = 0;
+/// let decoded: &str = codec.decode(&encoded, &mut decode_offset).unwrap();
+/// assert_eq!(decoded, s);
+/// assert_eq!(decode_offset, 13);
+///
+/// let size = codec.measure(s).unwrap();
+/// assert_eq!(size, 13);
+///
+/// let fixed_size = codec.measure_fixed();
+/// assert_eq!(fixed_size, 13);
+/// ```
+///
+/// ## Variable Size UTF-8 String with Length Prefix
+/// ```rust
+/// use byten::{UTF8Codec, Encoder, Decoder, Measurer, FixedMeasurer, BytesCodec, EndianCodec, EncoderToVec as _};
+///
+/// let s: &str = "Hello, world!";
+/// let prefix_codec = EndianCodec::<u16>::le();
+/// let bytes_codec = BytesCodec::new(prefix_codec);
+/// let codec = UTF8Codec::new(bytes_codec);
+///
+/// let mut encoded = codec.encode_to_vec(s).unwrap();
+/// assert_eq!(encoded.len(), 15);
+///
+/// let mut decode_offset = 0;
+/// let decoded: &str = codec.decode(&encoded, &mut decode_offset).unwrap();
+/// assert_eq!(decoded, s);
+/// assert_eq!(decode_offset, 15);
+///
+/// let size = codec.measure(s).unwrap();
+/// assert_eq!(size, 15);
+/// ```
+pub struct UTF8Codec<Codec>(Codec);
 
 impl<Codec> UTF8Codec<Codec> {
     pub const fn new(codec: Codec) -> Self {
-        Self { codec }
+        Self(codec)
     }
 }
 
@@ -22,7 +68,7 @@ where
         encoded: &'encoded [u8],
         offset: &mut usize,
     ) -> Result<Self::Decoded, crate::DecodeError> {
-        let bytes = self.codec.decode(encoded, offset)?;
+        let bytes = self.0.decode(encoded, offset)?;
         let s = std::str::from_utf8(bytes).map_err(|_| crate::DecodeError::InvalidData)?;
         Ok(s)
     }
@@ -40,7 +86,7 @@ where
         encoded: &mut [u8],
         offset: &mut usize,
     ) -> Result<(), crate::EncodeError> {
-        self.codec.encode(decoded.as_bytes(), encoded, offset)
+        self.0.encode(decoded.as_bytes(), encoded, offset)
     }
 }
 
@@ -51,7 +97,7 @@ where
     type Decoded = str;
 
     fn measure(&self, decoded: &Self::Decoded) -> Result<usize, crate::EncodeError> {
-        self.codec.measure(decoded.as_bytes())
+        self.0.measure(decoded.as_bytes())
     }
 }
 
@@ -61,10 +107,32 @@ where
     Codec: crate::Measurer<Decoded = [u8]>,
 {
     fn measure_fixed(&self) -> usize {
-        self.codec.measure_fixed()
+        self.0.measure_fixed()
     }
 }
 
+/// A codec for C-style null-terminated strings.
+///
+/// # Examples
+/// ```rust
+/// use byten::{CStrCodec, Encoder, Decoder, Measurer, EncoderToVec as _};
+///
+/// let s: &std::ffi::CStr = std::ffi::CStr::from_bytes_with_nul(b"Hello, world!\0").unwrap();
+///
+/// let codec = CStrCodec::new();
+///
+/// let mut encoded = codec.encode_to_vec(s).unwrap();
+/// assert_eq!(encoded, b"Hello, world!\0");
+///
+/// let mut decode_offset = 0;
+/// let decoded: &std::ffi::CStr = codec.decode(&encoded, &mut decode_offset).unwrap();
+///
+/// assert_eq!(decoded, s);
+/// assert_eq!(decode_offset, encoded.len());
+///
+/// let size = codec.measure(s).unwrap();
+/// assert_eq!(size, encoded.len());
+/// ```
 pub struct CStrCodec;
 
 impl CStrCodec {
@@ -120,49 +188,5 @@ impl crate::Measurer for CStrCodec {
 
     fn measure(&self, decoded: &Self::Decoded) -> Result<usize, crate::error::EncodeError> {
         Ok(decoded.to_bytes_with_nul().len())
-    }
-}
-
-pub struct CStrRefCodec;
-
-impl CStrRefCodec {
-    pub const fn new() -> Self {
-        Self
-    }
-}
-
-impl<'encoded, 'decoded> crate::Decoder<'encoded, 'decoded> for CStrRefCodec
-where
-    'encoded: 'decoded,
-{
-    type Decoded = &'decoded CStr;
-
-    fn decode(
-        &self,
-        encoded: &'encoded [u8],
-        offset: &mut usize,
-    ) -> Result<Self::Decoded, crate::error::DecodeError> {
-        CStrCodec.decode(encoded, offset)
-    }
-}
-
-impl crate::Encoder for CStrRefCodec {
-    type Decoded = CStr;
-
-    fn encode(
-        &self,
-        decoded: &Self::Decoded,
-        encoded: &mut [u8],
-        offset: &mut usize,
-    ) -> Result<(), crate::error::EncodeError> {
-        CStrCodec.encode(decoded, encoded, offset)
-    }
-}
-
-impl crate::Measurer for CStrRefCodec {
-    type Decoded = CStr;
-
-    fn measure(&self, decoded: &Self::Decoded) -> Result<usize, crate::error::EncodeError> {
-        CStrCodec.measure(decoded)
     }
 }

@@ -1,6 +1,33 @@
 use core::borrow;
 use std::{borrow::Borrow as _, ops::Deref};
 
+/// A codec that decodes to owned data by first decoding to borrowed data
+/// and then cloning it.
+///
+/// # Examples
+/// ## Fixed Size UTF-8 String
+/// ```rust
+/// use byten::{OwnedCodec, UTF8Codec, Encoder, Decoder, Measurer, FixedMeasurer, FixedU8SliceCodec, EncoderToVec as _};
+///
+/// let s: String = "Hello, world!".to_owned();
+/// let str_codec = UTF8Codec::new(FixedU8SliceCodec::new(13));
+/// let codec = OwnedCodec::new(str_codec);
+///
+/// let encoded = codec.encode_to_vec(&s).unwrap();
+/// assert_eq!(encoded.len(), 13);
+/// assert_eq!(encoded, b"Hello, world!");
+///
+/// let mut decode_offset = 0;
+/// let decoded: String = codec.decode(&encoded, &mut decode_offset).unwrap();
+/// assert_eq!(decoded, s);
+/// assert_eq!(decode_offset, 13);
+///
+/// let size = codec.measure(&s).unwrap();
+/// assert_eq!(size, 13);
+///
+/// let fixed_size = codec.measure_fixed();
+/// assert_eq!(fixed_size, 13);
+/// ```
 pub struct OwnedCodec<Codec> {
     pub codec: Codec,
 }

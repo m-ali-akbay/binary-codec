@@ -1,6 +1,41 @@
+//! A set of codecs for primitive types and fixed-size arrays.
+//!
+//! All the codecs in this module must include no implicit logic
+//! beyond the binary representation of the types they handle.
+
 use crate::{Decoder, Encoder, FixedMeasurer, Measurer, error};
 
+/// A codec for the `u8` type.
+///
+/// # Examples
+/// ```rust
+/// use byten::{U8Codec, Decoder, Encoder, FixedMeasurer, Measurer, DecodeError, EncodeError};
+///
+/// let value: u8 = 42;
+///
+/// let mut encoded = [0u8; 1];
+/// let mut offset = 0;
+/// U8Codec.encode(&value, &mut encoded, &mut offset).unwrap();
+/// assert_eq!(offset, 1);
+///
+/// let mut decode_offset = 0;
+/// let decoded: u8 = U8Codec.decode(&encoded, &mut decode_offset).unwrap();
+/// assert_eq!(decoded, value);
+/// assert_eq!(decode_offset, 1);
+///
+/// let size = U8Codec.measure(&value).unwrap();
+/// assert_eq!(size, 1);
+///
+/// let fixed_size = U8Codec.measure_fixed();
+/// assert_eq!(fixed_size, 1);
+/// ```
 pub struct U8Codec;
+
+impl U8Codec {
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Decoder<'_, '_> for U8Codec {
     type Decoded = u8;
@@ -48,7 +83,37 @@ impl Measurer for U8Codec {
     }
 }
 
+/// A codec for the `i8` type.
+///
+//// # Examples
+/// ```rust
+/// use byten::{I8Codec, Decoder, Encoder, FixedMeasurer, Measurer, DecodeError, EncodeError};
+///
+/// let value: i8 = -42;
+///
+/// let mut encoded = [0u8; 1];
+/// let mut offset = 0;
+/// I8Codec.encode(&value, &mut encoded, &mut offset).unwrap();
+/// assert_eq!(offset, 1);
+///
+/// let mut decode_offset = 0;
+/// let decoded: i8 = I8Codec.decode(&encoded, &mut decode_offset).unwrap();
+/// assert_eq!(decoded, value);
+/// assert_eq!(decode_offset, 1);
+///
+/// let size = I8Codec.measure(&value).unwrap();
+/// assert_eq!(size, 1);
+///
+/// let fixed_size = I8Codec.measure_fixed();
+/// assert_eq!(fixed_size, 1);
+/// ```
 pub struct I8Codec;
+
+impl I8Codec {
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Decoder<'_, '_> for I8Codec {
     type Decoded = i8;
@@ -96,7 +161,37 @@ impl Measurer for I8Codec {
     }
 }
 
+/// A codec for fixed-size arrays of `u8`.
+///
+/// # Examples
+/// ```rust
+/// use byten::{U8ArrayCodec, Decoder, Encoder, FixedMeasurer, Measurer, DecodeError, EncodeError};
+///
+/// let array: [u8; 4] = [1, 2, 3, 4];
+/// let mut encoded = [0u8; 4];
+/// let mut offset = 0;
+///
+/// U8ArrayCodec::<4>.encode(&array, &mut encoded, &mut offset).unwrap();
+/// assert_eq!(offset, 4);
+///
+/// let mut decode_offset = 0;
+/// let decoded: [u8; 4] = U8ArrayCodec::<4>.decode(&encoded, &mut decode_offset).unwrap();
+/// assert_eq!(decoded, array);
+/// assert_eq!(decode_offset, 4);
+///
+/// let size = U8ArrayCodec::<4>.measure(&array).unwrap();
+/// assert_eq!(size, 4);
+///
+/// let fixed_size = U8ArrayCodec::<4>.measure_fixed();
+/// assert_eq!(fixed_size, 4);
+/// ```
 pub struct U8ArrayCodec<const N: usize>;
+
+impl<const N: usize> U8ArrayCodec<N> {
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl<const N: usize> Decoder<'_, '_> for U8ArrayCodec<N> {
     type Decoded = [u8; N];
@@ -134,7 +229,37 @@ impl<const N: usize> Measurer for U8ArrayCodec<N> {
     }
 }
 
+/// A codec for references to fixed-size arrays of `u8`.
+///
+/// # Examples
+/// ```rust
+/// use byten::{U8ArrayRefCodec, Decoder, Encoder, FixedMeasurer, Measurer, DecodeError, EncodeError};
+///
+/// let array_ref: &[u8; 4] = &[1, 2, 3, 4];
+///
+/// let mut encoded = [0u8; 4];
+/// let mut offset = 0;
+/// U8ArrayRefCodec.encode(array_ref, &mut encoded, &mut offset).unwrap();
+/// assert_eq!(offset, 4);
+///
+/// let mut decode_offset = 0;
+/// let decoded: &[u8; 4] = U8ArrayRefCodec.decode(&encoded, &mut decode_offset).unwrap();
+/// assert_eq!(decoded, array_ref);
+/// assert_eq!(decode_offset, 4);
+///
+/// let size = U8ArrayRefCodec::<4>.measure(array_ref).unwrap();
+/// assert_eq!(size, 4);
+///
+/// let fixed_size = U8ArrayRefCodec::<4>.measure_fixed();
+/// assert_eq!(fixed_size, 4);
+/// ```
 pub struct U8ArrayRefCodec<const N: usize>;
+
+impl<const N: usize> U8ArrayRefCodec<N> {
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl<'encoded: 'decoded, 'decoded, const N: usize> Decoder<'encoded, 'decoded>
     for U8ArrayRefCodec<N>
@@ -184,7 +309,123 @@ impl<const N: usize> Measurer for U8ArrayRefCodec<N> {
     }
 }
 
+/// A codec for fixed-size slices of `u8`.
+///
+/// # Examples
+/// ```rust
+/// use byten::{FixedU8SliceCodec, Decoder, Encoder, FixedMeasurer, Measurer, DecodeError, EncodeError};
+///
+/// let slice: &[u8] = &[1, 2, 3, 4];
+/// let codec = FixedU8SliceCodec::new(4);
+///
+/// let mut encoded = [0u8; 4];
+/// let mut offset = 0;
+///
+/// codec.encode(slice, &mut encoded, &mut offset).unwrap();
+/// assert_eq!(offset, 4);
+///
+/// let mut decode_offset = 0;
+/// let decoded: &[u8] = codec.decode(&encoded, &mut decode_offset).unwrap();
+/// assert_eq!(decoded, slice);
+/// assert_eq!(decode_offset, 4);
+///
+/// let size = codec.measure(slice).unwrap();
+/// assert_eq!(size, 4);
+///
+/// let fixed_size = codec.measure_fixed();
+/// assert_eq!(fixed_size, 4);
+/// ```
+pub struct FixedU8SliceCodec(usize);
+
+impl FixedU8SliceCodec {
+    pub const fn new(length: usize) -> FixedU8SliceCodec {
+        FixedU8SliceCodec(length)
+    }
+}
+
+impl<'encoded: 'decoded, 'decoded> Decoder<'encoded, 'decoded> for FixedU8SliceCodec {
+    type Decoded = &'decoded [u8];
+    fn decode(
+        &self,
+        encoded: &'encoded [u8],
+        offset: &mut usize,
+    ) -> Result<Self::Decoded, error::DecodeError> {
+        if *offset + self.0 > encoded.len() {
+            return Err(error::DecodeError::EOF);
+        }
+        let slice = &encoded[*offset..*offset + self.0];
+        *offset += self.0;
+        Ok(slice)
+    }
+}
+
+impl Encoder for FixedU8SliceCodec {
+    type Decoded = [u8];
+    fn encode(
+        &self,
+        decoded: &Self::Decoded,
+        encoded: &mut [u8],
+        offset: &mut usize,
+    ) -> Result<(), error::EncodeError> {
+        if decoded.len() != self.0 {
+            return Err(error::EncodeError::InvalidData);
+        }
+        if *offset + self.0 > encoded.len() {
+            return Err(error::EncodeError::BufferTooSmall);
+        }
+        encoded[*offset..*offset + self.0].copy_from_slice(decoded);
+        *offset += self.0;
+        Ok(())
+    }
+}
+
+impl FixedMeasurer for FixedU8SliceCodec {
+    fn measure_fixed(&self) -> usize {
+        self.0
+    }
+}
+
+impl Measurer for FixedU8SliceCodec {
+    type Decoded = [u8];
+    fn measure(&self, decoded: &Self::Decoded) -> Result<usize, error::EncodeError> {
+        if decoded.len() != self.0 {
+            return Err(error::EncodeError::InvalidData);
+        }
+        Ok(self.measure_fixed())
+    }
+}
+
+/// A codec for the `bool` type.
+///
+/// # Examples
+/// ```rust
+/// use byten::{BoolCodec, Decoder, Encoder, FixedMeasurer, Measurer, DecodeError, EncodeError};
+///
+/// let value: bool = true;
+///
+/// let mut encoded = [0u8; 1];
+/// let mut offset = 0;
+/// BoolCodec.encode(&value, &mut encoded, &mut offset).unwrap();
+/// assert_eq!(offset, 1);
+///
+/// let mut decode_offset = 0;
+/// let decoded: bool = BoolCodec.decode(&encoded, &mut decode_offset).unwrap();
+/// assert_eq!(decoded, value);
+/// assert_eq!(decode_offset, 1);
+///
+/// let size = BoolCodec.measure(&value).unwrap();
+/// assert_eq!(size, 1);
+///
+/// let fixed_size = BoolCodec.measure_fixed();
+/// assert_eq!(fixed_size, 1);
+/// ```
 pub struct BoolCodec;
+
+impl BoolCodec {
+    pub const fn new() -> Self {
+        Self
+    }
+}
 
 impl Decoder<'_, '_> for BoolCodec {
     type Decoded = bool;
@@ -234,7 +475,38 @@ impl Measurer for BoolCodec {
     }
 }
 
+/// A codec that boxes the decoded value of another codec.
+///
+/// # Examples
+/// ```rust
+/// use byten::{BoxCodec, EndianCodec, Decoder, Encoder, FixedMeasurer, Measurer, DecodeError, EncodeError};
+///
+/// let codec = BoxCodec::new(EndianCodec::<u32>::le());
+/// let value: Box<u32> = Box::new(42);
+///
+/// let mut encoded = [0u8; 4];
+/// let mut offset = 0;
+/// codec.encode(&value, &mut encoded, &mut offset).unwrap();
+/// assert_eq!(offset, 4);
+///
+/// let mut decode_offset = 0;
+/// let decoded: Box<u32> = codec.decode(&encoded, &mut decode_offset).unwrap();
+/// assert_eq!(*decoded, *value);
+/// assert_eq!(decode_offset, 4);
+///
+/// let size = codec.measure(&value).unwrap();
+/// assert_eq!(size, 4);
+///
+/// let fixed_size = codec.measure_fixed();
+/// assert_eq!(fixed_size, 4);
+/// ```
 pub struct BoxCodec<Codec>(pub Codec);
+
+impl<Codec> BoxCodec<Codec> {
+    pub const fn new(codec: Codec) -> Self {
+        Self(codec)
+    }
+}
 
 impl<'encoded, 'decoded, Codec, T> Decoder<'encoded, 'decoded> for BoxCodec<Codec>
 where

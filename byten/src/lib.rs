@@ -1,3 +1,38 @@
+//! A binary codec framework for encoding and decoding Rust types to and from byte slices.
+//!
+//! It provides traits and implementations for codecs, encoders, decoders,
+//! measurers, and fixed-size measurers.
+//!
+//! The library is designed to be extensible and efficient, allowing users to define
+//! custom codecs for their types while leveraging existing implementations for common types.
+//!
+//! # Features
+//! - `derive`: Enables procedural macros for deriving codec implementations for structs and enums.
+//!
+//! # Built-in Codecs
+//! | Codec Type                           | Default for | Description                                                           |
+//! |--------------------------------------|-------------|-----------------------------------------------------------------------|
+//! | `U8Codec`                            | `u8`        | Codec for `u8` type                                                   |
+//! | `I8Codec`                            | `i8`        | Codec for `i8` type                                                   |
+//! | `U8ArrayCodec<N>`                    | `[u8; N]`   | Codec for fixed-size arrays of `u8` of size `N`                       |
+//! | `U8ArrayRefCodec<N>`                 | `&[u8; N]`  | Codec for references to fixed-size arrays of `u8` of size `N`         |
+//! | `FixedU8SliceCodec(length)`          |             | Codec for fixed-size slices of `u8` of size `length`                  |
+//! | `BoolCodec`                          | `bool`      | Codec for `bool` type                                                 |
+//! | `BoxCodec(t_codec)`                  | `Box<T>`    | Codec for `Box<T>` where `t_codec` is the codec for `T`               |
+//! | `ArrayCodec<.., N>(item_codec)`      |             | Codec for fixed-size arrays of `Item` of size `N`                     |
+//! | `EndianCodec<T>::le()`               |             | Codec for primitive types with little-endian byte order               |
+//! | `EndianCodec<T>::be()`               |             | Codec for primitive types with big-endian byte order                  |
+//! | `SelfCoded<T>::new()`                |             | Codec for derived type `T`                                            |
+//! | `UTF8Codec(bytes_codec)`             |             | Codec for `&str` type using the provided bytes codec                  |
+//! | `CStrCodec`                          | `CStr`      | Codec for C-style strings (`CStr` and `&CStr`)                        |
+//! | `OwnedCodec(t_codec)`                |             | Codec that decodes to owned data by cloning from borrowed data        |
+//! | `VecCodec(item_codec, length_codec)` |             | Codec for `Vec<Item>` using the provided item and length codecs       |
+//! | `RemainingCodec`                     |             | Codec for all remaining bytes in the input                            |
+//! | `UVarBECodec<T>::new()`              |             | Codec for unsigned variable-length big-endian integers of type `T`    |
+//! | `OptionCodec(t_codec)`               | `Option<T>` | Codec for `Option<T>` using the provided codec for `T`                |
+//! | `BytesCodec(length_codec)`           |             | Codec for byte slices with length prefixed by the provided codec      |
+//!
+
 mod array;
 mod asis;
 mod endian;
@@ -390,9 +425,9 @@ impl DefaultCodec for CStr {
 }
 
 impl DefaultCodec for &CStr {
-    type Codec = CStrRefCodec;
+    type Codec = CStrCodec;
     fn default_codec() -> Self::Codec {
-        CStrRefCodec
+        CStrCodec
     }
 }
 

@@ -2,6 +2,28 @@ use std::{marker::PhantomData, option::Option as StdOption, vec::Vec as StdVec};
 
 use crate::{BoolCodec, U8Codec, error::DecodeError};
 
+/// A codec for variable-size vectors of fixed/dynamic sized elements.
+/// The length of the vector is encoded/decoded as a prefix using the provided length codec.
+///
+/// # Examples
+/// ```rust
+/// use byten::{VecCodec, Encoder, Decoder, Measurer, EncoderToVec as _, EndianCodec};
+///
+/// let length_codec = EndianCodec::<u16>::le();
+/// let item_codec = EndianCodec::<u32>::le();
+/// let codec = VecCodec::new(item_codec, length_codec);
+/// let vec: Vec<u32> = vec![1, 2, 3, 4];
+///
+/// let mut encoded = codec.encode_to_vec(&vec).unwrap();
+/// assert_eq!(encoded.len(), 2 + 4 * 4);
+///
+/// let mut decode_offset = 0;
+/// let decoded: Vec<u32> = codec.decode(&encoded, &mut decode_offset).unwrap();
+/// assert_eq!(decoded, vec);
+///
+/// let size = codec.measure(&vec).unwrap();
+/// assert_eq!(size, 2 + 4 * 4);
+/// ```
 pub struct VecCodec<Item, Length> {
     pub item: Item,
     pub length: Length,
@@ -89,6 +111,26 @@ where
     }
 }
 
+/// A codec that draws all remaining bytes from the input during decoding,
+/// and writes all bytes during encoding.
+///
+/// This codec is useful for handling trailing data of unknown/unbounded length.
+///
+/// # Examples
+/// ```rust
+/// use byten::{RemainingCodec, Encoder, Decoder, Measurer, EncoderToVec as _};
+///
+/// let codec = RemainingCodec::new();
+/// let data: &[u8] = b"Hello, world!";
+///
+/// let mut encoded = codec.encode_to_vec(data).unwrap();
+/// assert_eq!(encoded, b"Hello, world!");
+///
+/// let mut decode_offset = 0;
+/// let decoded: &[u8] = codec.decode(&encoded, &mut decode_offset).unwrap();
+/// assert_eq!(decoded, data);
+/// assert_eq!(decode_offset, encoded.len());
+/// ```
 pub struct RemainingCodec;
 
 impl RemainingCodec {
@@ -186,6 +228,39 @@ macro_rules! u_bit_stream {
 }
 u_bit_stream!(u16, u32, u64, u128, usize);
 
+/// A codec for unsigned variable-length big-endian encoded integers.
+/// The integer is represented as a series of 7-bit septets, where the most significant bit of each septet
+/// indicates whether there are more septets to follow.
+///
+/// The septets are stored in big-endian order, meaning the most significant septet comes first.
+/// This allows comparison of encoded values using standard lexicographical byte-wise comparison without decoding.
+///
+/// This codec supports integer types that implement the `BitStream` trait.
+///
+/// Minimum size is 1 byte (for value 0), maximum size depends on the number of bits in the type.
+/// As the size is variable, there is no fixed size measurement.
+/// The compressions achieved by this codec is beneficial when smaller values are more common by truncating
+/// leading (most significant bits) zero septets.
+///
+/// This codec is useful for encoding integers in a compact form, especially when smaller values are more common.
+/// Also, useful for coding the length of slices, vectors, or other data structures where the length is not known in advance.
+///
+/// # Examples
+/// ```rust
+/// use byten::{UVarBECodec, Encoder, Decoder, Measurer, EncoderToVec as _};
+///
+/// let codec = UVarBECodec::<u64>::new();
+/// let value: u64 = 0x123456;
+///
+/// let mut encoded = codec.encode_to_vec(&value).unwrap();
+///
+/// let mut decode_offset = 0;
+/// let decoded = codec.decode(&encoded, &mut decode_offset).unwrap();
+/// assert_eq!(decoded, value);
+///
+/// let size = codec.measure(&value).unwrap();
+/// assert_eq!(size, encoded.len());
+/// ```
 #[derive(Copy, Clone)]
 pub struct UVarBECodec<T> {
     pub _marker: PhantomData<T>,
@@ -433,13 +508,45 @@ mod test {
     }
 }
 
-pub struct OptionCodec<Item> {
-    pub item: Item,
-}
+/// A codec for optional values.
+/// The presence of a value is indicated by a preceding boolean flag.
+/// If the flag is true, the value is absent (None).
+/// If the flag is false, the value is present (Some).
+///
+/// This coding is not fixed-size, as the size depends on whether the value is present or not.
+/// Unlike how Rust stores the Option type in the memory (fixed size and with compacted discriminant for some optimized types),
+/// this codec always uses one byte for the presence flag, followed by the encoded value if present
+///
+/// # Examples
+/// ```rust
+/// use byten::{OptionCodec, Encoder, Decoder, Measurer, EncoderToVec as _};
+///
+/// let item_codec = byten::EndianCodec::<u32>::le();
+/// let codec = OptionCodec::new(item_codec);
+/// let some_value = Some(0x12345678u32);
+/// let none_value: Option<u32> = None;
+///
+/// let mut encoded_some = codec.encode_to_vec(&some_value).unwrap();
+/// let mut encoded_none = codec.encode_to_vec(&none_value).unwrap();
+///
+/// let mut decode_offset = 0;
+/// let decoded_some: Option<u32> = codec.decode(&encoded_some, &mut decode_offset).unwrap();
+/// assert_eq!(decoded_some, some_value);
+///
+/// decode_offset = 0;
+/// let decoded_none: Option<u32> = codec.decode(&encoded_none, &mut decode_offset).unwrap();
+/// assert_eq!(decoded_none, none_value);
+///
+/// let some_size = codec.measure(&some_value).unwrap();
+/// let none_size = codec.measure(&none_value).unwrap();
+/// assert!(some_size > none_size);
+/// assert_eq!(none_size, 1);
+/// ```
+pub struct OptionCodec<Item>(Item);
 
 impl<Item> OptionCodec<Item> {
     pub fn new(item: Item) -> Self {
-        Self { item }
+        Self(item)
     }
 }
 
@@ -458,7 +565,7 @@ where
         if flag {
             Ok(StdOption::None)
         } else {
-            let item = self.item.decode(encoded, offset)?;
+            let item = self.0.decode(encoded, offset)?;
             Ok(StdOption::Some(item))
         }
     }
@@ -484,7 +591,7 @@ where
             }
             StdOption::Some(item) => {
                 BoolCodec.encode(&false, encoded, offset)?;
-                self.item.encode(item, encoded, offset)
+                self.0.encode(item, encoded, offset)
             }
         }
     }
@@ -500,18 +607,38 @@ where
     fn measure(&self, decoded: &Self::Decoded) -> Result<usize, crate::error::EncodeError> {
         Ok(match decoded {
             StdOption::None => BoolCodec.measure(&true)?,
-            StdOption::Some(item) => BoolCodec.measure(&false)? + self.item.measure(item)?,
+            StdOption::Some(item) => BoolCodec.measure(&false)? + self.0.measure(item)?,
         })
     }
 }
 
-pub struct BytesCodec<Length> {
-    pub length: Length,
-}
+/// A codec for byte slices with a length prefix.
+/// The length of the byte slice is encoded/decoded using the provided length codec.
+///
+/// # Examples
+/// ```rust
+/// use byten::{BytesCodec, Encoder, Decoder, Measurer, EncoderToVec as _};
+///
+/// let length_codec = byten::EndianCodec::<u16>::le();
+/// let codec = BytesCodec::new(length_codec);
+/// let data: &[u8] = b"Hello, world!";
+///
+/// let mut encoded = codec.encode_to_vec(data).unwrap();
+/// assert_eq!(encoded.len(), 2 + data.len());
+///
+/// let mut decode_offset = 0;
+/// let decoded: &[u8] = codec.decode(&encoded, &mut decode_offset).unwrap();
+/// assert_eq!(decoded, data);
+/// assert_eq!(decode_offset, encoded.len());
+///
+/// let size = codec.measure(data).unwrap();
+/// assert_eq!(size, 2 + data.len());
+/// ```
+pub struct BytesCodec<Length>(Length);
 
 impl<Length> BytesCodec<Length> {
     pub const fn new(length: Length) -> Self {
-        Self { length }
+        Self(length)
     }
 }
 
@@ -530,7 +657,7 @@ where
         offset: &mut usize,
     ) -> Result<Self::Decoded, crate::error::DecodeError> {
         let size = self
-            .length
+            .0
             .decode(encoded, offset)?
             .try_into()
             .map_err(Into::into)?;
@@ -558,7 +685,7 @@ where
         offset: &mut usize,
     ) -> Result<(), crate::error::EncodeError> {
         let size = decoded.len();
-        self.length
+        self.0
             .encode(&size.try_into().map_err(Into::into)?, encoded, offset)?;
         let end = *offset + size;
         if end > encoded.len() {
@@ -580,7 +707,7 @@ where
 
     fn measure(&self, decoded: &Self::Decoded) -> Result<usize, crate::error::EncodeError> {
         let size = decoded.len();
-        let size_measure = self.length.measure(&size.try_into().map_err(Into::into)?)?;
+        let size_measure = self.0.measure(&size.try_into().map_err(Into::into)?)?;
         Ok(size_measure + size)
     }
 }
