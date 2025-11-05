@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.12] - 2025-11-05
+
+### Fixed
+- Codec table in the lib docs was rendering incorrectly due to a missing column separator 
+
 ## [0.0.11] - 2025-11-05
 
 ### Added
@@ -50,7 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Previous releases before standardized changelog
 
-[Unreleased]: https://github.com/m-ali-akbay/byten/compare/v0.0.11...HEAD
+[Unreleased]: https://github.com/m-ali-akbay/byten/compare/v0.0.12...HEAD
+[0.0.12]: https://github.com/m-ali-akbay/byten/compare/v0.0.11...v0.0.12
 [0.0.11]: https://github.com/m-ali-akbay/byten/compare/v0.0.10...v0.0.11
 [0.0.10]: https://github.com/m-ali-akbay/byten/compare/v0.0.9...v0.0.10
 [0.0.9]: https://github.com/m-ali-akbay/byten/releases/tag/v0.0.9

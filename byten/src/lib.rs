@@ -10,8 +10,8 @@
 //! - `derive`: Enables procedural macros for deriving codec implementations for structs and enums.
 //!
 //! # Built-in Codecs
-//! | Codec Type            | Default for | #[byten(...)] | Codes                                                                       |
-//! |-----------------------|-------------|---------------------------------------------------------------------------------------------|
+//! | Codec Type            | Default for | #[byten(...)]               | Codes                                                         |
+//! |-----------------------|-------------|-----------------------------|---------------------------------------------------------------|
 //! | [`U8Codec`]           | `u8`        | `u8`                        |  `u8` type                                                    |
 //! | [`I8Codec`]           | `i8`        | `i8`                        |  `i8` type                                                    |
 //! | [`U8ArrayCodec`]      | `[u8; N]`   | `[u8; N]`                   | fixed-size arrays of `u8` of size `N`                         |
