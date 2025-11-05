@@ -10,27 +10,26 @@
 //! - `derive`: Enables procedural macros for deriving codec implementations for structs and enums.
 //!
 //! # Built-in Codecs
-//! | Codec Type                           | Default for | Description                                                           |
-//! |--------------------------------------|-------------|-----------------------------------------------------------------------|
-//! | `U8Codec`                            | `u8`        | Codec for `u8` type                                                   |
-//! | `I8Codec`                            | `i8`        | Codec for `i8` type                                                   |
-//! | `U8ArrayCodec<N>`                    | `[u8; N]`   | Codec for fixed-size arrays of `u8` of size `N`                       |
-//! | `U8ArrayRefCodec<N>`                 | `&[u8; N]`  | Codec for references to fixed-size arrays of `u8` of size `N`         |
-//! | `FixedU8SliceCodec(length)`          |             | Codec for fixed-size slices of `u8` of size `length`                  |
-//! | `BoolCodec`                          | `bool`      | Codec for `bool` type                                                 |
-//! | `BoxCodec(t_codec)`                  | `Box<T>`    | Codec for `Box<T>` where `t_codec` is the codec for `T`               |
-//! | `ArrayCodec<.., N>(item_codec)`      |             | Codec for fixed-size arrays of `Item` of size `N`                     |
-//! | `EndianCodec<T>::le()`               |             | Codec for primitive types with little-endian byte order               |
-//! | `EndianCodec<T>::be()`               |             | Codec for primitive types with big-endian byte order                  |
-//! | `SelfCoded<T>::new()`                |             | Codec for derived type `T`                                            |
-//! | `UTF8Codec(bytes_codec)`             |             | Codec for `&str` type using the provided bytes codec                  |
-//! | `CStrCodec`                          | `CStr`      | Codec for C-style strings (`CStr` and `&CStr`)                        |
-//! | `OwnedCodec(t_codec)`                |             | Codec that decodes to owned data by cloning from borrowed data        |
-//! | `VecCodec(item_codec, length_codec)` |             | Codec for `Vec<Item>` using the provided item and length codecs       |
-//! | `RemainingCodec`                     |             | Codec for all remaining bytes in the input                            |
-//! | `UVarBECodec<T>::new()`              |             | Codec for unsigned variable-length big-endian integers of type `T`    |
-//! | `OptionCodec(t_codec)`               | `Option<T>` | Codec for `Option<T>` using the provided codec for `T`                |
-//! | `BytesCodec(length_codec)`           |             | Codec for byte slices with length prefixed by the provided codec      |
+//! | Codec Type            | Default for | #[byten(...)] | Codes                                                                       |
+//! |-----------------------|-------------|---------------------------------------------------------------------------------------------|
+//! | [`U8Codec`]           | `u8`        | `u8`                        |  `u8` type                                                    |
+//! | [`I8Codec`]           | `i8`        | `i8`                        |  `i8` type                                                    |
+//! | [`U8ArrayCodec`]      | `[u8; N]`   | `[u8; N]`                   | fixed-size arrays of `u8` of size `N`                         |
+//! | [`U8ArrayRefCodec`]   | `&[u8; N]`  | `&[u8; N]`                  |  references to fixed-size arrays of `u8` of size `N`          |
+//! | [`BoolCodec`]         | `bool`      | `bool`                      | `bool` type                                                   |
+//! | [`BoxCodec`]          | `Box<T>`    | `Box<T>` or `... box`       | `Box<T>` where `t_codec` is the codec for `T`                 |
+//! | [`ArrayCodec`]        |             | `... $arr`                  | fixed-size arrays, `[Item; N]`                                |
+//! | [`EndianCodec`]       |             | `... $be` or `... $le`      | primitive types with little/big endian byte orders            |
+//! | [`SelfCoded`]         |             | `{SelfCoded::<T>::new()}`   | derived type `T`                                              |
+//! | [`UTF8Codec`]         |             | `$utf8`                     | `&str` type using the provided bytes codec                    |
+//! | [`CStrCodec`]         | `CStr`      | `CStr` or `&CStr`           | C-style strings (`CStr` and `&CStr`)                          |
+//! | [`OwnedCodec`]        |             | `... $own`                  | owned data by cloning from borrowed data                      |
+//! | [`VecCodec`]          |             | `... $vec[len]`             | `Vec<Item>` using the provided item and length codecs         |
+//! | [`RemainingCodec`]    |             | `..`                        | all remaining bytes in the input                              |
+//! | [`UVarBECodec`]       |             | `... $uvarbe`               | unsigned variable-length big-endian integers                  |
+//! | [`OptionCodec`]       | `Option<T>` | `... $opt`                  | `Option<T>` using the provided codec for `T`                  |
+//! | [`BytesCodec`]        |             | `$bytes[len]`               | byte slices with length prefixed by the provided codec        |
+//! | [`PhantomCodec`]      |             | `= expr`                    | phantom codec with 0 size, codes the given constant value     |
 //!
 
 mod array;

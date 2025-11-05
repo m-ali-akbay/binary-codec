@@ -117,7 +117,7 @@ use std::ffi::CString;
 pub struct Directory {
     #[byten(CStr $own)]
     pub name: CString,
-    #[byten($vec(Box<Entry>)[u16 $be])]
+    #[byten(Entry box $vec[u16 $be])]
     pub entries: Vec<Box<Entry>>,
 }
 
@@ -160,11 +160,13 @@ The `#[byten(...)]` attribute supports a flexible syntax for customizing encodin
 
 - **Endianness**: `$be` (big-endian), `$le` (little-endian)
 - **Variable-length**: `$uvarbe` (variable-length unsigned, big-endian)
-- **Collections**: `$vec(T)[Length]`, `$arr[T]`
+- **Collections**: `T $vec[Length]`, `T $arr`
 - **Bytes**: `$bytes[Length]` for raw byte slices
 - **Strings**: `$utf8` for UTF-8 strings, `CStr` for C strings
 - **Ownership**: `$own` to decode into owned data (e.g., `String`, `Vec`)
 - **Optional**: `$opt` for `Option<T>` types with presence byte
+- **Boxing**: `box` for `Box<T>` types
+- **Phantom**: `= expr` for constant values with zero bytes
 - **Remaining**: `..` to consume rest of input
 - **Custom**: `{ expr }` for custom codec expressions
 

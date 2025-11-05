@@ -2,7 +2,7 @@ use byten::{Decode, DecodeOwned, DefaultCodec, Encode, EncodeToVec as _, Measure
 
 #[derive(Debug, DefaultCodec, Encode, Measure, DecodeOwned)]
 pub struct Foo {
-    #[byten($arr[u16 $uvarbe])]
+    #[byten(u16 $uvarbe $arr)]
     pub bar: [u16; 4],
 }
 

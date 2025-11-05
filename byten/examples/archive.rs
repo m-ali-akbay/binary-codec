@@ -6,7 +6,7 @@ use byten::{Decode, DecodeOwned, DefaultCodec, Encode, EncodeToVec as _, Measure
 pub struct Directory {
     #[byten(CStr $own)]
     pub name: CString,
-    #[byten($vec(Box<Entry>)[u16 $be])]
+    #[byten(Entry box $vec[u16 $be])]
     pub entries: Vec<Box<Entry>>,
 }
 

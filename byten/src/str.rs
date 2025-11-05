@@ -7,10 +7,10 @@ use std::ffi::CStr;
 /// # Examples
 /// ## Fixed Size UTF-8 String
 /// ```rust
-/// use byten::{UTF8Codec, Encoder, Decoder, Measurer, FixedMeasurer, FixedU8SliceCodec, EncoderToVec as _};
+/// use byten::{UTF8Codec, Encoder, Decoder, Measurer, FixedMeasurer, BytesCodec, PhantomCodec, EncoderToVec as _};
 ///
 /// let s: &str = "Hello, world!";
-/// let codec = UTF8Codec::new(FixedU8SliceCodec::new(13));
+/// let codec = UTF8Codec::new(BytesCodec::new(PhantomCodec::new(13)));
 ///
 /// let encoded = codec.encode_to_vec(s).unwrap();
 /// assert_eq!(encoded.len(), 13);
@@ -23,9 +23,6 @@ use std::ffi::CStr;
 ///
 /// let size = codec.measure(s).unwrap();
 /// assert_eq!(size, 13);
-///
-/// let fixed_size = codec.measure_fixed();
-/// assert_eq!(fixed_size, 13);
 /// ```
 ///
 /// ## Variable Size UTF-8 String with Length Prefix

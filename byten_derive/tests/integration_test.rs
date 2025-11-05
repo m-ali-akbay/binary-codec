@@ -7,7 +7,7 @@ struct Person {
     #[byten( $bytes[u8] $utf8 $own )]
     name: String,
     birthday: Date,
-    #[byten( $vec(Color)[usize $uvarbe] )]
+    #[byten( Color $vec[usize $uvarbe] )]
     favorite_colors: Vec<Color>,
 }
 
@@ -40,6 +40,11 @@ enum Color {
     } = 5,
     Gradient(Box<Color>, Box<Color>) = 6,
     ColorCode(#[byten($be)] u64) = 7,
+    ColorName4(
+        #[byten( $bytes[=4] )]
+        #[byten( $utf8 $own )]
+        String,
+    ) = 8,
     Unknown() = 255,
 }
 
@@ -70,6 +75,7 @@ mod test {
                 },
                 Color::Gradient(Box::new(Color::Green), Box::new(Color::Blue)),
                 Color::ColorCode(0b110010101010),
+                Color::ColorName4("Cyan".into()),
                 Color::Unknown(),
             ],
         };
@@ -81,7 +87,7 @@ mod test {
             23,   // birthday.day: u8(23)
             10,   // birthday.month: u8(10)
             0x07, 0xAD,       // birthday.year: U16BE(1965)
-            0b00000110, // favorite_colors length: var::USizeBE(6)
+            0b00000111, // favorite_colors length: var::USizeBE(7)
             0x01, 0x00, // Color::Red discriminant: U16LE(1)
             0x04, 0x00, // Color::Grayscale discriminant: U16LE(4)
             0x00, 0x80, // Grayscale value: U16BE(128)
@@ -95,6 +101,8 @@ mod test {
             // Color::ColorCode value: U64BE(0b110010101010)
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // padding for U64BE
             0b1100, 0b10101010, // full bytes
+            0x08, 0x00, // Color::ColorName4 discriminant: U16LE(8)
+            0x43, 0x79, 0x61, 0x6e, // name: "Cyan"
             0xff, 0x00, // Color::Unknown discriminant: U16LE(255)
         ];
 

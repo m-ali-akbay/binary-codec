@@ -5,7 +5,7 @@ use syn::{
     parse::{ParseStream, Parser},
     parse_quote,
     spanned::Spanned,
-    token::Brace,
+    token::{Brace, Paren},
 };
 
 use super::{BinarySchema, DecodeContext, EncodeContext, MeasureContext};
@@ -254,6 +254,38 @@ impl Operand for ArrOperand {
     }
 }
 
+struct PhantomOperand {
+    span: Span,
+    value: Expr,
+}
+
+impl Operand for PhantomOperand {
+    fn span(&self) -> Span {
+        self.span
+    }
+
+    fn codec(&self) -> Expr {
+        let value = &self.value;
+        parse_quote! { ::byten::PhantomCodec::new(#value) }
+    }
+}
+
+struct BoxOperand {
+    span: Span,
+    base: Box<dyn Operand>,
+}
+
+impl Operand for BoxOperand {
+    fn span(&self) -> Span {
+        self.span
+    }
+
+    fn codec(&self) -> Expr {
+        let base = self.base.codec();
+        parse_quote! { ::byten::BoxCodec::new(#base) }
+    }
+}
+
 pub fn build_codec_expr(tokens: TokenStream) -> syn::Result<Expr> {
     let span = tokens.span();
     let operand = Parser::parse2(
@@ -322,6 +354,12 @@ fn build_codec(
     stream: ParseStream,
     operand: Box<dyn Operand>,
 ) -> Result<Box<dyn Operand>, syn::Error> {
+    if stream.peek(Paren) {
+        let content;
+        syn::parenthesized!(content in stream);
+        return build_codec_pipeline(&content, operand);
+    }
+
     if stream.peek(Brace) {
         let content;
         syn::braced!(content in stream);
@@ -335,6 +373,23 @@ fn build_codec(
     if stream.peek(Token![..]) {
         let _dots: Token![..] = stream.parse()?;
         return Ok(Box::new(RemainingOperand { span: _dots.span() }));
+    }
+
+    if stream.peek(Token![=]) {
+        let eq_token: Token![=] = stream.parse()?;
+        let value: Expr = stream.parse()?;
+        return Ok(Box::new(PhantomOperand {
+            span: eq_token.span(),
+            value,
+        }));
+    }
+
+    if stream.peek(Token![box]) {
+        let box_token: Token![box] = stream.parse()?;
+        return Ok(Box::new(BoxOperand {
+            span: box_token.span(),
+            base: operand,
+        }));
     }
 
     if stream.peek(Token![$]) {
@@ -368,13 +423,6 @@ fn build_codec(
             }
             "vec" => {
                 let content;
-                syn::parenthesized!(content in stream);
-                let item = build_codec_pipeline(
-                    &content,
-                    Box::new(DefaultOperand { span: ident.span() }),
-                )?;
-
-                let content;
                 syn::bracketed!(content in stream);
                 let length = build_codec_pipeline(
                     &content,
@@ -383,22 +431,14 @@ fn build_codec(
 
                 Ok(Box::new(VecOperand {
                     span: ident.span(),
-                    item,
+                    item: operand,
                     length,
                 }))
             }
-            "arr" => {
-                let content;
-                syn::bracketed!(content in stream);
-                let item = build_codec_pipeline(
-                    &content,
-                    Box::new(DefaultOperand { span: ident.span() }),
-                )?;
-                Ok(Box::new(ArrOperand {
-                    span: ident.span(),
-                    item,
-                }))
-            }
+            "arr" => Ok(Box::new(ArrOperand {
+                span: ident.span(),
+                item: operand,
+            })),
             "opt" => Ok(Box::new(OptOperand {
                 span: ident.span(),
                 base: operand,
