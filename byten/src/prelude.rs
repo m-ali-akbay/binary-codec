@@ -1,4 +1,6 @@
 use crate::{Decoder, DefaultCodec, Encoder, Measurer, error::DecodeError, error::EncodeError};
+#[cfg(feature = "alloc")]
+use alloc::{vec, vec::Vec};
 
 pub trait DecodeDefault<'encoded>: Sized {
     fn decode(
@@ -34,7 +36,10 @@ where
 }
 
 pub trait EncodeToVec {
+    #[cfg(feature = "alloc")]
     fn encode_to_vec(&self) -> Result<Vec<u8>, EncodeError>;
+
+    fn encode_to_heapless_vec<const N: usize>(&self) -> Result<heapless::Vec<u8, N>, EncodeError>;
 }
 
 impl<T, Codec> EncodeToVec for T
@@ -42,28 +47,55 @@ where
     T: DefaultCodec<Codec = Codec> + ?Sized,
     Codec: Encoder<Decoded = T> + Measurer<Decoded = T>,
 {
+    #[cfg(feature = "alloc")]
     fn encode_to_vec(&self) -> Result<Vec<u8>, EncodeError> {
         let codec = Self::default_codec();
-        let size = codec.measure(self)?;
-        let mut vec = vec![0u8; size];
-        let mut offset = 0;
-        codec.encode(self, &mut vec, &mut offset)?;
-        Ok(vec)
+        EncoderToVec::encode_to_vec(&codec, self)
+    }
+
+    fn encode_to_heapless_vec<const N: usize>(&self) -> Result<heapless::Vec<u8, N>, EncodeError> {
+        let codec = Self::default_codec();
+        EncoderToVec::encode_to_heapless_vec(&codec, self)
     }
 }
 
 pub trait EncoderToVec {
     type Decoded: ?Sized;
+
+    #[cfg(feature = "alloc")]
     fn encode_to_vec(&self, decoded: &Self::Decoded) -> Result<Vec<u8>, EncodeError>;
+
+    fn encode_to_heapless_vec<const N: usize>(
+        &self,
+        decoded: &Self::Decoded,
+    ) -> Result<heapless::Vec<u8, N>, EncodeError>;
 }
 
 impl<Decoded: ?Sized, C: Encoder<Decoded = Decoded> + Measurer<Decoded = Decoded>> EncoderToVec
     for C
 {
     type Decoded = Decoded;
+
+    #[cfg(feature = "alloc")]
     fn encode_to_vec(&self, decoded: &Self::Decoded) -> Result<Vec<u8>, crate::error::EncodeError> {
         let size = self.measure(decoded)?;
         let mut vec = vec![0u8; size];
+        let mut offset = 0;
+        self.encode(decoded, &mut vec, &mut offset)?;
+        Ok(vec)
+    }
+
+    fn encode_to_heapless_vec<const N: usize>(
+        &self,
+        decoded: &Self::Decoded,
+    ) -> Result<heapless::Vec<u8, N>, crate::error::EncodeError> {
+        let size = self.measure(decoded)?;
+        if size > N {
+            return Err(crate::error::EncodeError::BufferTooSmall);
+        }
+        let mut vec = heapless::Vec::<u8, N>::new();
+        vec.resize_default(size)
+            .map_err(|_| crate::error::EncodeError::BufferTooSmall)?;
         let mut offset = 0;
         self.encode(decoded, &mut vec, &mut offset)?;
         Ok(vec)

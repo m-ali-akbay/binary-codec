@@ -88,8 +88,8 @@ impl BinarySchema for EnumSchema {
             match discriminant {
                 #(#variants),*,
                 _ => Err(::byten::DecodeError::InvalidDiscriminant),
-            }
-        }? })
+            }?
+        } })
     }
 
     fn encode(&self, ctx: &EncodeContext) -> syn::Result<proc_macro2::TokenStream> {

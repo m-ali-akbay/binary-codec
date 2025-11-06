@@ -29,8 +29,7 @@ fn _derive_default_codec(input: DeriveInput) -> syn::Result<TokenStream> {
                 ::byten::SelfCoded::<Self>::new()
             }
         }
-    }
-    .into())
+    })
 }
 
 #[proc_macro_derive(DefaultCodec, attributes(byten))]
@@ -58,8 +57,9 @@ fn _derive_decode_owned(input: DeriveInput) -> syn::Result<TokenStream> {
                 Ok(#decoded)
             }
         }
-    }
-    .into())
+
+        impl #generics ::byten::DecodeOwned for #ident #generics {}
+    })
 }
 
 #[proc_macro_derive(DecodeOwned, attributes(byten))]
@@ -87,7 +87,7 @@ fn _derive_decode(input: DeriveInput) -> syn::Result<TokenStream> {
                 Ok(#decoded)
             }
         }
-    }.into())
+    })
 }
 
 #[proc_macro_derive(Decode, attributes(byten))]
@@ -118,7 +118,7 @@ fn _derive_encode(input: DeriveInput) -> syn::Result<TokenStream> {
                 Ok(())
             }
         }
-    }.into())
+    })
 }
 
 #[proc_macro_derive(Encode, attributes(byten))]
@@ -146,8 +146,7 @@ fn _derive_measure(input: DeriveInput) -> syn::Result<TokenStream> {
                 Ok(#measured)
             }
         }
-    }
-    .into())
+    })
 }
 
 #[proc_macro_derive(Measure, attributes(byten))]
@@ -186,6 +185,5 @@ fn _derive_measure_fixed(input: DeriveInput) -> syn::Result<TokenStream> {
                 Ok(Self::measure_fixed())
             }
         }
-    }
-    .into())
+    })
 }

@@ -1,5 +1,5 @@
-use std::convert::Infallible;
-use std::num::TryFromIntError;
+use core::convert::Infallible;
+use core::num::TryFromIntError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

@@ -1,4 +1,5 @@
-use std::ffi::CStr;
+use core::ffi::CStr;
+use core::str;
 
 /// A codec for UTF-8 encoded strings.
 ///
@@ -12,9 +13,9 @@ use std::ffi::CStr;
 /// let s: &str = "Hello, world!";
 /// let codec = UTF8Codec::new(BytesCodec::new(PhantomCodec::new(13)));
 ///
-/// let encoded = codec.encode_to_vec(s).unwrap();
+/// let encoded = codec.encode_to_heapless_vec::<20>(s).unwrap();
 /// assert_eq!(encoded.len(), 13);
-/// assert_eq!(encoded, b"Hello, world!");
+/// assert_eq!(encoded.as_slice(), b"Hello, world!");
 ///
 /// let mut decode_offset = 0;
 /// let decoded: &str = codec.decode(&encoded, &mut decode_offset).unwrap();
@@ -34,7 +35,7 @@ use std::ffi::CStr;
 /// let bytes_codec = BytesCodec::new(prefix_codec);
 /// let codec = UTF8Codec::new(bytes_codec);
 ///
-/// let mut encoded = codec.encode_to_vec(s).unwrap();
+/// let encoded = codec.encode_to_heapless_vec::<20>(s).unwrap();
 /// assert_eq!(encoded.len(), 15);
 ///
 /// let mut decode_offset = 0;
@@ -66,7 +67,7 @@ where
         offset: &mut usize,
     ) -> Result<Self::Decoded, crate::DecodeError> {
         let bytes = self.0.decode(encoded, offset)?;
-        let s = std::str::from_utf8(bytes).map_err(|_| crate::DecodeError::InvalidData)?;
+        let s = str::from_utf8(bytes).map_err(|_| crate::DecodeError::InvalidData)?;
         Ok(s)
     }
 }
@@ -118,8 +119,8 @@ where
 ///
 /// let codec = CStrCodec::new();
 ///
-/// let mut encoded = codec.encode_to_vec(s).unwrap();
-/// assert_eq!(encoded, b"Hello, world!\0");
+/// let encoded = codec.encode_to_heapless_vec::<20>(s).unwrap();
+/// assert_eq!(encoded.as_slice(), b"Hello, world!\0");
 ///
 /// let mut decode_offset = 0;
 /// let decoded: &std::ffi::CStr = codec.decode(&encoded, &mut decode_offset).unwrap();
