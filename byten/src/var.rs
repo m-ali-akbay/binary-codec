@@ -118,6 +118,122 @@ where
     }
 }
 
+/// A codec for heapless vectors of fixed/dynamic sized elements.
+/// The length of the vector is encoded/decoded as a prefix using the provided length codec.
+/// The maximum size of the vector is determined by the const generic parameter N.
+///
+/// # Examples
+/// ```rust
+/// use byten::{HeaplessVecCodec, Encoder, Decoder, Measurer, EncoderToVec as _, EndianCodec};
+///
+/// let length_codec = EndianCodec::<u16>::le();
+/// let item_codec = EndianCodec::<u32>::le();
+/// let codec = HeaplessVecCodec::<_, _, 10>::new(item_codec, length_codec);
+///
+/// let vec: heapless::Vec<u32, 10> = heapless::Vec::from_slice(&[1, 2, 3, 4]).unwrap();
+///
+/// let encoded = codec.encode_to_heapless_vec::<20>(&vec).unwrap();
+/// assert_eq!(encoded.len(), 2 + 4 * 4);
+///
+/// let mut decode_offset = 0;
+/// let decoded: heapless::Vec<u32, 10> = codec.decode(&encoded, &mut decode_offset).unwrap();
+/// assert_eq!(decoded, vec);
+///
+/// let size = codec.measure(&vec).unwrap();
+/// assert_eq!(size, 2 + 4 * 4);
+/// ```
+pub struct HeaplessVecCodec<Item, Length, const N: usize> {
+    pub item: Item,
+    pub length: Length,
+}
+
+impl<Item, Length, const N: usize> HeaplessVecCodec<Item, Length, N> {
+    pub const fn new(item: Item, length: Length) -> Self {
+        Self { item, length }
+    }
+}
+
+impl<'encoded, 'decoded, 'length, Item, Length, const N: usize> crate::Decoder<'encoded, 'decoded>
+    for HeaplessVecCodec<Item, Length, N>
+where
+    Item: crate::Decoder<'encoded, 'decoded>,
+    Length: crate::Decoder<'encoded, 'length>,
+    Length::Decoded: TryInto<usize>,
+    <Length::Decoded as TryInto<usize>>::Error: Into<crate::DecodeError>,
+    'encoded: 'decoded,
+{
+    type Decoded = heapless::Vec<Item::Decoded, N>;
+
+    fn decode(
+        &self,
+        encoded: &'encoded [u8],
+        offset: &mut usize,
+    ) -> Result<Self::Decoded, crate::DecodeError> {
+        let size = self
+            .length
+            .decode(encoded, offset)?
+            .try_into()
+            .map_err(Into::into)?;
+        if size > N {
+            return Err(crate::DecodeError::InvalidData);
+        }
+        let mut vec: heapless::Vec<Item::Decoded, N> = heapless::Vec::new();
+        for _ in 0..size {
+            let item = self.item.decode(encoded, offset)?;
+            vec.push(item)
+                .unwrap_or_else(|_| panic!("unexpected heapless vec overflow"));
+        }
+        Ok(vec)
+    }
+}
+
+impl<Item, Length, const N: usize> crate::Encoder for HeaplessVecCodec<Item, Length, N>
+where
+    Length: crate::Encoder,
+    Length::Decoded: TryFrom<usize>,
+    <Length::Decoded as TryFrom<usize>>::Error: Into<crate::EncodeError>,
+    Item: crate::Encoder,
+    Item::Decoded: Sized,
+{
+    type Decoded = heapless::Vec<Item::Decoded, N>;
+
+    fn encode(
+        &self,
+        decoded: &Self::Decoded,
+        encoded: &mut [u8],
+        offset: &mut usize,
+    ) -> Result<(), crate::EncodeError> {
+        let size = decoded.len();
+        self.length
+            .encode(&size.try_into().map_err(Into::into)?, encoded, offset)?;
+        for item in decoded.iter() {
+            self.item.encode(item, encoded, offset)?;
+        }
+        Ok(())
+    }
+}
+
+impl<Item, Length, const N: usize> crate::Measurer for HeaplessVecCodec<Item, Length, N>
+where
+    Length: crate::Measurer,
+    Length::Decoded: TryFrom<usize>,
+    <Length::Decoded as TryFrom<usize>>::Error: Into<crate::error::EncodeError>,
+    Item: crate::Measurer,
+    Item::Decoded: Sized,
+{
+    type Decoded = heapless::Vec<Item::Decoded, N>;
+
+    fn measure(&self, decoded: &Self::Decoded) -> Result<usize, crate::error::EncodeError> {
+        let size = decoded.len();
+        let size_measure = self.length.measure(&size.try_into().map_err(Into::into)?)?;
+        let mut items_measure = 0;
+        for item in decoded.iter() {
+            items_measure += self.item.measure(item)?;
+        }
+        Ok(size_measure + items_measure)
+    }
+}
+
 /// A codec that draws all remaining bytes from the input during decoding,
 /// and writes all bytes during encoding.
 ///
