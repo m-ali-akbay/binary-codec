@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `no_std` support with new `std` and `alloc` feature flags
+- `encode_to_heapless_vec` in preludes as a helper for `no_std` environments
+
+### Changed
+- **Breaking**: Allocation-dependent codecs (`VecCodec`, `BoxCodec`, `UVarBECodec`, `OwnedCodec`) require the `alloc` feature
+- Error handling with `anyhow` requires the `std` feature
+- Default features now include `std`, `alloc`, `anyhow`, and `derive`
+
 ## [0.0.12] - 2025-11-05
 
 ### Fixed
