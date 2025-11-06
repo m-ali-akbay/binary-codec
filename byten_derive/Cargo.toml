@@ -19,3 +19,6 @@ syn = "2.0.108"
 
 [dev-dependencies]
 byten = { workspace = true }
+
+[lints]
+workspace = true

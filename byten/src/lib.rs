@@ -51,7 +51,6 @@
 //! Adds: `Vec<T>`, `Box<T>`, owned strings, variable-length encoding
 //!
 
-
 #![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(feature = "alloc")]
@@ -65,6 +64,7 @@ mod prelude;
 mod selfcoded;
 mod str;
 mod util;
+mod uvarbe;
 mod var;
 
 #[cfg(feature = "alloc")]
@@ -90,6 +90,8 @@ pub use selfcoded::*;
 pub use str::*;
 #[doc(inline)]
 pub use util::*;
+#[doc(inline)]
+pub use uvarbe::*;
 #[doc(inline)]
 pub use var::*;
 

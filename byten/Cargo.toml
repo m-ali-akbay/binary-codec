@@ -24,3 +24,6 @@ byten_derive = { workspace = true, optional = true }
 heapless = "0.9.1"
 anyhow = { version = "1", optional = true }
 thiserror = { version = "2", default-features = false }
+
+[lints]
+workspace = true

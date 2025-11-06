@@ -15,3 +15,6 @@ categories = ["encoding", "parsing"]
 [workspace.dependencies]
 byten = { version = "0.0", path = "./byten" }
 byten_derive = { version = "0.0", path = "./byten_derive" }
+
+[workspace.lints.clippy]
+new_without_default = "allow"

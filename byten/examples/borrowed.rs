@@ -22,12 +22,12 @@ pub struct Person<'encoded> {
 
 fn main() {
     let person = Person {
-        first_name: CStr::from_bytes_with_nul(b"Alice\0").unwrap(),
-        last_name: CStr::from_bytes_with_nul(b"Smith\0").unwrap(),
+        first_name: c"Alice",
+        last_name: c"Smith",
         address: "123 Main St, Springfield",
         avatar_image: &[0x11, 0x22, 0x33, 0x44, 0x55, 0x66],
         passcode: &[1, 2, 3, 4],
-        extra_data: &"Some extra information",
+        extra_data: "Some extra information",
     };
 
     let encoded = person.encode_to_vec().unwrap();

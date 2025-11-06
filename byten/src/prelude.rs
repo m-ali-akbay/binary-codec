@@ -1,6 +1,8 @@
 #[cfg(feature = "alloc")]
+use crate::Measurer;
+use crate::{Decoder, DefaultCodec, Encoder, error::DecodeError, error::EncodeError};
+#[cfg(feature = "alloc")]
 use alloc::{vec, vec::Vec};
-use crate::{Decoder, DefaultCodec, Encoder, Measurer, error::DecodeError, error::EncodeError};
 
 pub trait DecodeDefault<'encoded>: Sized {
     fn decode(

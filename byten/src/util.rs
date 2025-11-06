@@ -1,5 +1,6 @@
 #[cfg(feature = "alloc")]
 use alloc::borrow::ToOwned;
+#[cfg(feature = "alloc")]
 use core::{borrow, borrow::Borrow as _, ops::Deref};
 
 #[cfg(feature = "alloc")]

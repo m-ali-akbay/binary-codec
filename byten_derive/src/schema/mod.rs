@@ -58,8 +58,8 @@ pub struct MeasureContext {
 
 pub fn interpret_derive_schema(input: &DeriveInput) -> syn::Result<Box<dyn BinarySchema>> {
     match &input.data {
-        syn::Data::Struct(_) => interpret_struct_schema(&input),
-        syn::Data::Enum(_) => interpret_enum_schema(&input),
+        syn::Data::Struct(_) => interpret_struct_schema(input),
+        syn::Data::Enum(_) => interpret_enum_schema(input),
         _ => Err(syn::Error::new(
             input.span(),
             "Only structs and enums are supported",

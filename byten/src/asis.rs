@@ -3,9 +3,9 @@
 //! All the codecs in this module must include no implicit logic
 //! beyond the binary representation of the types they handle.
 
+use crate::{Decoder, Encoder, FixedMeasurer, Measurer, error};
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
-use crate::{Decoder, Encoder, FixedMeasurer, Measurer, error};
 
 /// A codec for the `u8` type.
 ///
@@ -87,7 +87,7 @@ impl Measurer for U8Codec {
 
 /// A codec for the `i8` type.
 ///
-//// # Examples
+/// # Examples
 /// ```rust
 /// use byten::{I8Codec, Decoder, Encoder, FixedMeasurer, Measurer, DecodeError, EncodeError};
 ///

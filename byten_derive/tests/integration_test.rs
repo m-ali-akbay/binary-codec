@@ -39,8 +39,8 @@ enum Color {
         alpha: u16,
     } = 5,
     Gradient(Box<Color>, Box<Color>) = 6,
-    ColorCode(#[byten($be)] u64) = 7,
-    ColorName4(
+    Code(#[byten($be)] u64) = 7,
+    Name(
         #[byten( $bytes[=4] )]
         #[byten( $utf8 $own )]
         String,
@@ -74,8 +74,8 @@ mod test {
                     alpha: 65535,
                 },
                 Color::Gradient(Box::new(Color::Green), Box::new(Color::Blue)),
-                Color::ColorCode(0b110010101010),
-                Color::ColorName4("Cyan".into()),
+                Color::Code(0b110010101010),
+                Color::Name("Cyan".into()),
                 Color::Unknown(),
             ],
         };
@@ -97,11 +97,11 @@ mod test {
             0x06, 0x00, // Color::Gradient discriminant: U16LE(6)
             0x02, 0x00, // Color::Green discriminant: U16LE(2)
             0x03, 0x00, // Color::Blue discriminant: U16LE(3)
-            0x07, 0x00, // Color::ColorCode discriminant: U16LE(7);
-            // Color::ColorCode value: U64BE(0b110010101010)
+            0x07, 0x00, // Color::Code discriminant: U16LE(7);
+            // Color::Code value: U64BE(0b110010101010)
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // padding for U64BE
             0b1100, 0b10101010, // full bytes
-            0x08, 0x00, // Color::ColorName4 discriminant: U16LE(8)
+            0x08, 0x00, // Color::Name discriminant: U16LE(8)
             0x43, 0x79, 0x61, 0x6e, // name: "Cyan"
             0xff, 0x00, // Color::Unknown discriminant: U16LE(255)
         ];
