@@ -125,13 +125,13 @@ where
 ///
 /// # Examples
 /// ```rust
-/// use byten::{RemainingCodec, Encoder, Decoder, Measurer, EncoderToVec as _};
+/// use byten::{RemainingCodec, Encoder, Decoder, Measurer, EncoderToHeaplessVec as _};
 ///
 /// let codec = RemainingCodec::new();
 /// let data: &[u8] = b"Hello, world!";
 ///
-/// let mut encoded = codec.encode_to_vec(data).unwrap();
-/// assert_eq!(encoded, b"Hello, world!");
+/// let encoded = codec.encode_to_heapless_vec::<20>(data).unwrap();
+/// assert_eq!(encoded.as_slice(), b"Hello, world!");
 ///
 /// let mut decode_offset = 0;
 /// let decoded: &[u8] = codec.decode(&encoded, &mut decode_offset).unwrap();
@@ -204,15 +204,15 @@ impl crate::Measurer for RemainingCodec {
 ///
 /// # Examples
 /// ```rust
-/// use byten::{OptionCodec, Encoder, Decoder, Measurer, EncoderToVec as _};
+/// use byten::{OptionCodec, Encoder, Decoder, Measurer, EncoderToHeaplessVec as _};
 ///
 /// let item_codec = byten::EndianCodec::<u32>::le();
 /// let codec = OptionCodec::new(item_codec);
 /// let some_value = Some(0x12345678u32);
 /// let none_value: Option<u32> = None;
 ///
-/// let mut encoded_some = codec.encode_to_vec(&some_value).unwrap();
-/// let mut encoded_none = codec.encode_to_vec(&none_value).unwrap();
+/// let encoded_some = codec.encode_to_heapless_vec::<10>(&some_value).unwrap();
+/// let encoded_none = codec.encode_to_heapless_vec::<10>(&none_value).unwrap();
 ///
 /// let mut decode_offset = 0;
 /// let decoded_some: Option<u32> = codec.decode(&encoded_some, &mut decode_offset).unwrap();
@@ -302,13 +302,13 @@ where
 ///
 /// # Examples
 /// ```rust
-/// use byten::{BytesCodec, Encoder, Decoder, Measurer, EncoderToVec as _};
+/// use byten::{BytesCodec, Encoder, Decoder, Measurer, EncoderToHeaplessVec as _};
 ///
 /// let length_codec = byten::EndianCodec::<u16>::le();
 /// let codec = BytesCodec::new(length_codec);
 /// let data: &[u8] = b"Hello, world!";
 ///
-/// let mut encoded = codec.encode_to_vec(data).unwrap();
+/// let encoded = codec.encode_to_heapless_vec::<20>(data).unwrap();
 /// assert_eq!(encoded.len(), 2 + data.len());
 ///
 /// let mut decode_offset = 0;

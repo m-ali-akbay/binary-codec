@@ -8,14 +8,14 @@ use core::str;
 /// # Examples
 /// ## Fixed Size UTF-8 String
 /// ```rust
-/// use byten::{UTF8Codec, Encoder, Decoder, Measurer, FixedMeasurer, BytesCodec, PhantomCodec, EncoderToVec as _};
+/// use byten::{UTF8Codec, Encoder, Decoder, Measurer, FixedMeasurer, BytesCodec, PhantomCodec, EncoderToHeaplessVec as _};
 ///
 /// let s: &str = "Hello, world!";
 /// let codec = UTF8Codec::new(BytesCodec::new(PhantomCodec::new(13)));
 ///
-/// let encoded = codec.encode_to_vec(s).unwrap();
+/// let encoded = codec.encode_to_heapless_vec::<20>(s).unwrap();
 /// assert_eq!(encoded.len(), 13);
-/// assert_eq!(encoded, b"Hello, world!");
+/// assert_eq!(encoded.as_slice(), b"Hello, world!");
 ///
 /// let mut decode_offset = 0;
 /// let decoded: &str = codec.decode(&encoded, &mut decode_offset).unwrap();
@@ -28,14 +28,14 @@ use core::str;
 ///
 /// ## Variable Size UTF-8 String with Length Prefix
 /// ```rust
-/// use byten::{UTF8Codec, Encoder, Decoder, Measurer, FixedMeasurer, BytesCodec, EndianCodec, EncoderToVec as _};
+/// use byten::{UTF8Codec, Encoder, Decoder, Measurer, FixedMeasurer, BytesCodec, EndianCodec, EncoderToHeaplessVec as _};
 ///
 /// let s: &str = "Hello, world!";
 /// let prefix_codec = EndianCodec::<u16>::le();
 /// let bytes_codec = BytesCodec::new(prefix_codec);
 /// let codec = UTF8Codec::new(bytes_codec);
 ///
-/// let mut encoded = codec.encode_to_vec(s).unwrap();
+/// let encoded = codec.encode_to_heapless_vec::<20>(s).unwrap();
 /// assert_eq!(encoded.len(), 15);
 ///
 /// let mut decode_offset = 0;
@@ -113,14 +113,14 @@ where
 ///
 /// # Examples
 /// ```rust
-/// use byten::{CStrCodec, Encoder, Decoder, Measurer, EncoderToVec as _};
+/// use byten::{CStrCodec, Encoder, Decoder, Measurer, EncoderToHeaplessVec as _};
 ///
 /// let s: &std::ffi::CStr = std::ffi::CStr::from_bytes_with_nul(b"Hello, world!\0").unwrap();
 ///
 /// let codec = CStrCodec::new();
 ///
-/// let mut encoded = codec.encode_to_vec(s).unwrap();
-/// assert_eq!(encoded, b"Hello, world!\0");
+/// let encoded = codec.encode_to_heapless_vec::<20>(s).unwrap();
+/// assert_eq!(encoded.as_slice(), b"Hello, world!\0");
 ///
 /// let mut decode_offset = 0;
 /// let decoded: &std::ffi::CStr = codec.decode(&encoded, &mut decode_offset).unwrap();

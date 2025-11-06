@@ -66,13 +66,14 @@ u_bit_stream!(u16, u32, u64, u128, usize);
 /// Also, useful for coding the length of slices, vectors, or other data structures where the length is not known in advance.
 ///
 /// # Examples
-/// ```rust
-/// use byten::{UVarBECodec, Encoder, Decoder, Measurer, EncoderToVec as _};
+#[cfg_attr(feature = "alloc", doc = "```rust")]
+#[cfg_attr(not(feature = "alloc"), doc = "```ignore")]
+/// use byten::{UVarBECodec, Encoder, Decoder, Measurer, EncoderToHeaplessVec as _};
 ///
 /// let codec = UVarBECodec::<u64>::new();
 /// let value: u64 = 0x123456;
 ///
-/// let mut encoded = codec.encode_to_vec(&value).unwrap();
+/// let encoded = codec.encode_to_heapless_vec::<10>(&value).unwrap();
 ///
 /// let mut decode_offset = 0;
 /// let decoded = codec.decode(&encoded, &mut decode_offset).unwrap();

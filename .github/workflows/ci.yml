@@ -11,9 +11,9 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  # Code quality checks
-  quality:
-    name: Code Quality
+  # Code quality and integration checks
+  quality_and_integration:
+    name: Code Quality and Integration
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4

@@ -116,13 +116,12 @@ pub trait ConstantCoder {
 ///
 /// # Examples
 /// ```rust
-/// use byten::{PhantomCodec, Encoder, Decoder, Measurer, FixedMeasurer, EncoderToVec as _};
+/// use byten::{PhantomCodec, Encoder, Decoder, Measurer, FixedMeasurer, EncoderToHeaplessVec as _};
 ///
 /// let codec = PhantomCodec::new(42u32);
 ///
-/// let encoded = codec.encode_to_vec(&42u32).unwrap();
+/// let encoded = codec.encode_to_heapless_vec::<10>(&42u32).unwrap();
 /// assert_eq!(encoded.len(), 0);
-/// assert_eq!(encoded, vec![]);
 ///
 /// let mut decode_offset = 0;
 /// let decoded: u32 = codec.decode(&encoded, &mut decode_offset).unwrap();
