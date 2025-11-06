@@ -52,6 +52,9 @@ jobs:
       env:
         RUSTDOCFLAGS: -D warnings
 
+    - name: Test byten_derive
+      run: cargo test -p byten_derive
+
   # Test different feature combinations
   feature-matrix:
     name: Test Feature Combinations
@@ -106,7 +109,3 @@ jobs:
     
     - name: Test doc examples with ${{ matrix.features.name }}
       run: cargo test --doc ${{ matrix.features.flags }} -p byten
-    
-    - name: Check byten_derive with ${{ matrix.features.name }}
-      if: contains(matrix.features.flags, 'derive')
-      run: cargo test ${{ matrix.features.flags }} -p byten_derive
