@@ -125,7 +125,7 @@ where
 ///
 /// # Examples
 /// ```rust
-/// use byten::{RemainingCodec, Encoder, Decoder, Measurer, EncoderToHeaplessVec as _};
+/// use byten::{RemainingCodec, Encoder, Decoder, Measurer, EncoderToVec as _};
 ///
 /// let codec = RemainingCodec::new();
 /// let data: &[u8] = b"Hello, world!";
@@ -204,7 +204,7 @@ impl crate::Measurer for RemainingCodec {
 ///
 /// # Examples
 /// ```rust
-/// use byten::{OptionCodec, Encoder, Decoder, Measurer, EncoderToHeaplessVec as _};
+/// use byten::{OptionCodec, Encoder, Decoder, Measurer, EncoderToVec as _};
 ///
 /// let item_codec = byten::EndianCodec::<u32>::le();
 /// let codec = OptionCodec::new(item_codec);
@@ -302,7 +302,7 @@ where
 ///
 /// # Examples
 /// ```rust
-/// use byten::{BytesCodec, Encoder, Decoder, Measurer, EncoderToHeaplessVec as _};
+/// use byten::{BytesCodec, Encoder, Decoder, Measurer, EncoderToVec as _};
 ///
 /// let length_codec = byten::EndianCodec::<u16>::le();
 /// let codec = BytesCodec::new(length_codec);

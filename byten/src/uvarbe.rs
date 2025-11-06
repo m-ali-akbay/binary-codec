@@ -1,8 +1,5 @@
-#[cfg(feature = "alloc")]
-use alloc::{vec, vec::Vec};
 use core::marker::PhantomData;
 
-#[cfg(feature = "alloc")]
 use crate::U8Codec;
 use crate::error::DecodeError;
 
@@ -10,6 +7,7 @@ pub type BitIndex = usize;
 
 pub trait BitStream: Sized {
     const BITS: usize;
+    type SeptetsStorage: Default + AsMut<[u8]> + AsRef<[u8]>;
 
     fn to_bits(&self) -> impl Iterator<Item = BitIndex>;
     fn try_from_bits(
@@ -21,6 +19,7 @@ macro_rules! u_bit_stream {
     ($($ty:tt),*) => {
         $(impl BitStream for $ty {
             const BITS: usize = $ty::BITS as usize;
+            type SeptetsStorage = [u8; { ($ty::BITS as usize / 7) + if $ty::BITS as usize % 7 == 0 { 0 } else { 1 } }];
 
             fn to_bits(&self) -> impl Iterator<Item = BitIndex> {
                 (0..Self::BITS as usize).filter_map(move |bit_index| {
@@ -66,9 +65,8 @@ u_bit_stream!(u16, u32, u64, u128, usize);
 /// Also, useful for coding the length of slices, vectors, or other data structures where the length is not known in advance.
 ///
 /// # Examples
-#[cfg_attr(feature = "alloc", doc = "```rust")]
-#[cfg_attr(not(feature = "alloc"), doc = "```ignore")]
-/// use byten::{UVarBECodec, Encoder, Decoder, Measurer, EncoderToHeaplessVec as _};
+/// ```rust
+/// use byten::{UVarBECodec, Encoder, Decoder, Measurer, EncoderToVec as _};
 ///
 /// let codec = UVarBECodec::<u64>::new();
 /// let value: u64 = 0x123456;
@@ -95,28 +93,31 @@ impl<T> UVarBECodec<T> {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl<T: BitStream> UVarBECodec<T> {
-    fn try_into_septets_le(num: &T) -> Result<Vec<u8>, crate::error::EncodeError> {
-        let septets = T::BITS / 7usize + if T::BITS % 7usize == 0 { 0 } else { 1 };
-        let mut septets: Vec<u8> = vec![0u8; septets];
+    fn try_into_septets_le(num: &T) -> Result<T::SeptetsStorage, crate::error::EncodeError> {
+        let mut septets = T::SeptetsStorage::default();
 
-        for bit_index in num.to_bits() {
-            let septet_index = bit_index / 7;
-            let septet = septets
-                .get_mut(septet_index)
-                .ok_or(crate::error::EncodeError::BitOverflow)?;
-            let septet_bit_index = bit_index % 7;
-            *septet |= 1 << septet_bit_index;
-        }
+        {
+            let septets = septets.as_mut();
+            for bit_index in num.to_bits() {
+                let septet_index = bit_index / 7;
+                let septet = septets
+                    .get_mut(septet_index)
+                    .ok_or(crate::error::EncodeError::BitOverflow)?;
+                let septet_bit_index = bit_index % 7;
+                *septet |= 1 << septet_bit_index;
+            }
+        };
 
         Ok(septets)
     }
 
     #[cfg(test)]
-    fn try_into_septets_be(num: &T) -> Result<Vec<u8>, crate::error::EncodeError> {
+    fn try_into_septets_be(num: &T) -> Result<T::SeptetsStorage, crate::error::EncodeError> {
         let mut septets_le = Self::try_into_septets_le(num)?;
-        septets_le.reverse();
+
+        septets_le.as_mut().reverse();
+
         Ok(septets_le)
     }
 
@@ -140,7 +141,6 @@ impl<T: BitStream> UVarBECodec<T> {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl<T: BitStream> crate::Encoder for UVarBECodec<T> {
     type Decoded = T;
     fn encode(
@@ -150,6 +150,7 @@ impl<T: BitStream> crate::Encoder for UVarBECodec<T> {
         offset: &mut usize,
     ) -> Result<(), crate::error::EncodeError> {
         let septets_le = Self::try_into_septets_le(decoded)?;
+        let septets_le = septets_le.as_ref();
 
         let trunc = septets_le.iter().rev().take_while(|&&b| b == 0).count();
         let full = septets_le.len() - trunc;
@@ -170,11 +171,11 @@ impl<T: BitStream> crate::Encoder for UVarBECodec<T> {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl<T: BitStream> crate::Measurer for UVarBECodec<T> {
     type Decoded = T;
     fn measure(&self, decoded: &T) -> Result<usize, crate::error::EncodeError> {
         let septets_le = Self::try_into_septets_le(decoded)?;
+        let septets_le = septets_le.as_ref();
 
         let trunc = septets_le.iter().rev().take_while(|&&b| b == 0).count();
         let full = septets_le.len() - trunc;
@@ -185,7 +186,6 @@ impl<T: BitStream> crate::Measurer for UVarBECodec<T> {
     }
 }
 
-#[cfg(feature = "alloc")]
 impl<'encoded, 'decoded, T: BitStream + 'decoded> crate::Decoder<'encoded, 'decoded>
     for UVarBECodec<T>
 {
@@ -196,22 +196,24 @@ impl<'encoded, 'decoded, T: BitStream + 'decoded> crate::Decoder<'encoded, 'deco
         encoded: &'encoded [u8],
         offset: &mut usize,
     ) -> Result<T, crate::error::DecodeError> {
-        let max_septets = T::BITS / 7usize + if T::BITS % 7usize == 0 { 0 } else { 1 };
-        let mut septets_be: Vec<u8> = Vec::with_capacity(max_septets);
+        let mut septets_be = T::SeptetsStorage::default();
+        let septets_be = septets_be.as_mut();
+        let mut septets_len = 0;
         for i in 0.. {
-            if i >= max_septets {
+            if i >= septets_be.len() {
                 return Err(crate::error::DecodeError::BitOverflow);
             }
             let flagged_septet = U8Codec.decode(encoded, offset)?;
             let flag = flagged_septet & 0x80;
             let septet = flagged_septet & 0x7F;
-            septets_be.push(septet);
+            septets_be[i] = septet;
+            septets_len += 1;
             if flag == 0 {
                 break;
             }
         }
 
-        Self::try_from_septets_be(septets_be.into_iter())
+        Self::try_from_septets_be(septets_be[..septets_len].iter().cloned())
     }
 }
 
@@ -302,26 +304,39 @@ mod test {
 
     #[test]
     fn test_uvarbe() {
-        let fixtures = [
-            (0u64, vec![0b00000000]),
-            (1u64, vec![0b00000001]),
-            (127u64, vec![0b01111111]),
-            (128u64, vec![0b10000001, 0b00000000]),
-            (255u64, vec![0b10000001, 0b01111111]),
-            (16383u64, vec![0b11111111, 0b01111111]),
-            (16384u64, vec![0b10000001, 0b10000000, 0b00000000]),
+        let fixtures: [(u64, heapless::Vec<u8, 16>); 8] = [
+            (0u64, heapless::Vec::from_slice(&[0b00000000]).unwrap()),
+            (1u64, heapless::Vec::from_slice(&[0b00000001]).unwrap()),
+            (127u64, heapless::Vec::from_slice(&[0b01111111]).unwrap()),
+            (
+                128u64,
+                heapless::Vec::from_slice(&[0b10000001, 0b00000000]).unwrap(),
+            ),
+            (
+                255u64,
+                heapless::Vec::from_slice(&[0b10000001, 0b01111111]).unwrap(),
+            ),
+            (
+                16383u64,
+                heapless::Vec::from_slice(&[0b11111111, 0b01111111]).unwrap(),
+            ),
+            (
+                16384u64,
+                heapless::Vec::from_slice(&[0b10000001, 0b10000000, 0b00000000]).unwrap(),
+            ),
             (
                 u64::MAX,
-                vec![
+                heapless::Vec::from_slice(&[
                     0b10000001, 0b11111111, 0b11111111, 0b11111111, 0b11111111, 0b11111111,
                     0b11111111, 0b11111111, 0b11111111, 0b01111111,
-                ],
+                ])
+                .unwrap(),
             ),
         ];
 
         for (num, encoded_fixture) in fixtures.iter() {
             let encoded = UVarBECodec::new()
-                .encode_to_vec(num)
+                .encode_to_heapless_vec::<10>(num)
                 .expect("Encoding failed");
             assert_eq!(&encoded, encoded_fixture, "Encoding failed for {}", num);
 

@@ -8,7 +8,7 @@ use core::str;
 /// # Examples
 /// ## Fixed Size UTF-8 String
 /// ```rust
-/// use byten::{UTF8Codec, Encoder, Decoder, Measurer, FixedMeasurer, BytesCodec, PhantomCodec, EncoderToHeaplessVec as _};
+/// use byten::{UTF8Codec, Encoder, Decoder, Measurer, FixedMeasurer, BytesCodec, PhantomCodec, EncoderToVec as _};
 ///
 /// let s: &str = "Hello, world!";
 /// let codec = UTF8Codec::new(BytesCodec::new(PhantomCodec::new(13)));
@@ -28,7 +28,7 @@ use core::str;
 ///
 /// ## Variable Size UTF-8 String with Length Prefix
 /// ```rust
-/// use byten::{UTF8Codec, Encoder, Decoder, Measurer, FixedMeasurer, BytesCodec, EndianCodec, EncoderToHeaplessVec as _};
+/// use byten::{UTF8Codec, Encoder, Decoder, Measurer, FixedMeasurer, BytesCodec, EndianCodec, EncoderToVec as _};
 ///
 /// let s: &str = "Hello, world!";
 /// let prefix_codec = EndianCodec::<u16>::le();
@@ -113,7 +113,7 @@ where
 ///
 /// # Examples
 /// ```rust
-/// use byten::{CStrCodec, Encoder, Decoder, Measurer, EncoderToHeaplessVec as _};
+/// use byten::{CStrCodec, Encoder, Decoder, Measurer, EncoderToVec as _};
 ///
 /// let s: &std::ffi::CStr = std::ffi::CStr::from_bytes_with_nul(b"Hello, world!\0").unwrap();
 ///

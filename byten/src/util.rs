@@ -116,7 +116,7 @@ pub trait ConstantCoder {
 ///
 /// # Examples
 /// ```rust
-/// use byten::{PhantomCodec, Encoder, Decoder, Measurer, FixedMeasurer, EncoderToHeaplessVec as _};
+/// use byten::{PhantomCodec, Encoder, Decoder, Measurer, FixedMeasurer, EncoderToVec as _};
 ///
 /// let codec = PhantomCodec::new(42u32);
 ///
