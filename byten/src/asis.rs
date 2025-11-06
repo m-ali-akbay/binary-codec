@@ -3,6 +3,8 @@
 //! All the codecs in this module must include no implicit logic
 //! beyond the binary representation of the types they handle.
 
+#[cfg(feature = "alloc")]
+use alloc::boxed::Box;
 use crate::{Decoder, Encoder, FixedMeasurer, Measurer, error};
 
 /// A codec for the `u8` type.
@@ -389,6 +391,7 @@ impl Measurer for BoolCodec {
     }
 }
 
+#[cfg(feature = "alloc")]
 /// A codec that boxes the decoded value of another codec.
 ///
 /// # Examples
@@ -416,12 +419,14 @@ impl Measurer for BoolCodec {
 /// ```
 pub struct BoxCodec<Codec>(pub Codec);
 
+#[cfg(feature = "alloc")]
 impl<Codec> BoxCodec<Codec> {
     pub const fn new(codec: Codec) -> Self {
         Self(codec)
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'encoded, 'decoded, Codec, T> Decoder<'encoded, 'decoded> for BoxCodec<Codec>
 where
     Codec: Decoder<'encoded, 'decoded, Decoded = T>,
@@ -438,6 +443,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<Codec, T> Encoder for BoxCodec<Codec>
 where
     Codec: Encoder<Decoded = T>,
@@ -453,6 +459,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<Codec> FixedMeasurer for BoxCodec<Codec>
 where
     Codec: FixedMeasurer,
@@ -462,6 +469,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<Codec> Measurer for BoxCodec<Codec>
 where
     Codec: Measurer,

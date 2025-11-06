@@ -1,6 +1,8 @@
-use core::borrow;
-use std::{borrow::Borrow as _, ops::Deref};
+#[cfg(feature = "alloc")]
+use alloc::borrow::ToOwned;
+use core::{borrow, borrow::Borrow as _, ops::Deref};
 
+#[cfg(feature = "alloc")]
 /// A codec that decodes to owned data by first decoding to borrowed data
 /// and then cloning it.
 ///
@@ -29,12 +31,14 @@ pub struct OwnedCodec<Codec> {
     pub codec: Codec,
 }
 
+#[cfg(feature = "alloc")]
 impl<Codec> OwnedCodec<Codec> {
     pub const fn new(codec: Codec) -> Self {
         Self { codec }
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'encoded, 'decoded, Codec> crate::Decoder<'encoded, 'decoded> for OwnedCodec<Codec>
 where
     Codec: crate::Decoder<'encoded, 'decoded>,
@@ -52,6 +56,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<Codec> crate::Encoder for OwnedCodec<Codec>
 where
     Codec: crate::Encoder,
@@ -69,6 +74,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<Codec> crate::Measurer for OwnedCodec<Codec>
 where
     Codec: crate::Measurer,
@@ -81,6 +87,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<Codec> crate::FixedMeasurer for OwnedCodec<Codec>
 where
     Codec: crate::FixedMeasurer,

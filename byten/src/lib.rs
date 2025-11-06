@@ -7,7 +7,10 @@
 //! custom codecs for their types while leveraging existing implementations for common types.
 //!
 //! # Features
-//! - `derive`: Enables procedural macros for deriving codec implementations for structs and enums.
+//! - `std`: Enables standard library support (enabled by default). Disable for `no_std` environments.
+//! - `alloc`: Enables types that require allocation (`Vec`, `Box`, `String`). Enabled by default via `std`, but can be used independently in `no_std` environments with an allocator.
+//! - `anyhow`: Integration with the `anyhow` error handling crate (enabled by default, requires `std`).
+//! - `derive`: Enables procedural macros for deriving self-coded trait implementations for structs and enums (enabled by default).
 //!
 //! # Built-in Codecs
 //! | Codec Type            | Default for | #[byten(...)]               | Codes                                                         |
@@ -31,6 +34,28 @@
 //! | [`BytesCodec`]        |             | `$bytes[len]`               | byte slices with length prefixed by the provided codec        |
 //! | [`PhantomCodec`]      |             | `= expr`                    | phantom codec with 0 size, codes the given constant value     |
 //!
+//! # Usage in `no_std` Environments
+//!
+//! ## Core only (no allocator)
+//! ```toml
+//! [dependencies]
+//! byten = { version = "0.0", default-features = false }
+//! ```
+//! Provides: primitives, arrays, slices, borrowed data (`&str`, `&[u8]`, `&CStr`)
+//!
+//! ## With allocator
+//! ```toml
+//! [dependencies]
+//! byten = { version = "0.0", default-features = false, features = ["alloc"] }
+//! ```
+//! Adds: `Vec<T>`, `Box<T>`, owned strings, variable-length encoding
+//!
+
+
+#![cfg_attr(not(feature = "std"), no_std)]
+
+#[cfg(feature = "alloc")]
+extern crate alloc;
 
 mod array;
 mod asis;
@@ -42,7 +67,9 @@ mod str;
 mod util;
 mod var;
 
-use std::{ffi::CStr, ops::Deref};
+#[cfg(feature = "alloc")]
+use alloc::boxed::Box;
+use core::{ffi::CStr, ops::Deref};
 
 #[cfg(feature = "derive")]
 pub use byten_derive::{Decode, DecodeOwned, DefaultCodec, Encode, Measure, MeasureFixed, byten};
@@ -406,6 +433,7 @@ impl DefaultCodec for bool {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<T> DefaultCodec for Box<T>
 where
     T: DefaultCodec + ?Sized,

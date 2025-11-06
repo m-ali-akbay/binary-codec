@@ -172,8 +172,61 @@ The `#[byten(...)]` attribute supports a flexible syntax for customizing encodin
 
 ## Features Flags
 
-- `derive` (default): Enable derive macros for `Encode`, `Decode`, and `Measure`
-- `anyhow` (default): Integration with the `anyhow` error handling crate
+- `std` (default): Enable standard library support. Disable for `no_std` environments with `default-features = false`
+- `alloc` (default via `std`): Enable types that require allocation (`Vec`, `Box`, `String`). Can be used in `no_std` with an allocator.
+- `anyhow` (default): Integration with the `anyhow` error handling crate (requires `std`)
+- `derive` (default): Enable derive macros for self-coded traits. Works in all modes (core-only, alloc, std).
+
+### Using in `no_std` Environments
+
+#### Without an allocator (core only)
+
+For embedded systems without an allocator, use only core types:
+
+```toml
+[dependencies]
+byten = { version = "0.0", default-features = false }
+```
+
+This provides support for:
+- Primitive types (`u8`, `i8`, `bool`, etc.)
+- Arrays and slices
+- Borrowed data (`&str`, `&[u8]`, `&CStr`)
+- Endian conversion
+- Fixed-size types
+
+With derive macros:
+
+```toml
+[dependencies]
+byten = { version = "0.0", default-features = false, features = ["derive"] }
+```
+
+**Note:** When using derive macros in core-only mode, avoid using `Vec`, `Box`, `String`, or other allocation-dependent types in your structs.
+
+#### With an allocator (core + alloc)
+
+For `no_std` environments with an allocator:
+
+```toml
+[dependencies]
+byten = { version = "0.0", default-features = false, features = ["alloc"] }
+```
+
+This adds support for:
+- `Vec<T>` collections
+- `Box<T>` heap allocation  
+- Owned strings (`String`)
+- Variable-length encoding (`UVarBECodec`)
+
+With derive macros (recommended for most use cases):
+
+```toml
+[dependencies]
+byten = { version = "0.0", default-features = false, features = ["alloc", "derive"] }
+```
+
+**Note:** The `derive` feature works in all modes (core-only, alloc, and std). The generated code will only use features that are enabled.
 
 ## Examples
 

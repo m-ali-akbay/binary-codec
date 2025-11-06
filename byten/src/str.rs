@@ -1,4 +1,5 @@
-use std::ffi::CStr;
+use core::ffi::CStr;
+use core::str;
 
 /// A codec for UTF-8 encoded strings.
 ///
@@ -66,7 +67,7 @@ where
         offset: &mut usize,
     ) -> Result<Self::Decoded, crate::DecodeError> {
         let bytes = self.0.decode(encoded, offset)?;
-        let s = std::str::from_utf8(bytes).map_err(|_| crate::DecodeError::InvalidData)?;
+        let s = str::from_utf8(bytes).map_err(|_| crate::DecodeError::InvalidData)?;
         Ok(s)
     }
 }

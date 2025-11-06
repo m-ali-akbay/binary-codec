@@ -1,3 +1,5 @@
+#[cfg(feature = "alloc")]
+use alloc::{vec, vec::Vec};
 use crate::{Decoder, DefaultCodec, Encoder, Measurer, error::DecodeError, error::EncodeError};
 
 pub trait DecodeDefault<'encoded>: Sized {
@@ -33,10 +35,12 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 pub trait EncodeToVec {
     fn encode_to_vec(&self) -> Result<Vec<u8>, EncodeError>;
 }
 
+#[cfg(feature = "alloc")]
 impl<T, Codec> EncodeToVec for T
 where
     T: DefaultCodec<Codec = Codec> + ?Sized,
@@ -52,11 +56,13 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 pub trait EncoderToVec {
     type Decoded: ?Sized;
     fn encode_to_vec(&self, decoded: &Self::Decoded) -> Result<Vec<u8>, EncodeError>;
 }
 
+#[cfg(feature = "alloc")]
 impl<Decoded: ?Sized, C: Encoder<Decoded = Decoded> + Measurer<Decoded = Decoded>> EncoderToVec
     for C
 {

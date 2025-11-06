@@ -1,7 +1,10 @@
-use std::{marker::PhantomData, option::Option as StdOption, vec::Vec as StdVec};
+#[cfg(feature = "alloc")]
+use alloc::{vec, vec::Vec};
+use core::{marker::PhantomData, option::Option};
 
 use crate::{BoolCodec, U8Codec, error::DecodeError};
 
+#[cfg(feature = "alloc")]
 /// A codec for variable-size vectors of fixed/dynamic sized elements.
 /// The length of the vector is encoded/decoded as a prefix using the provided length codec.
 ///
@@ -29,12 +32,14 @@ pub struct VecCodec<Item, Length> {
     pub length: Length,
 }
 
+#[cfg(feature = "alloc")]
 impl<Item, Length> VecCodec<Item, Length> {
     pub const fn new(item: Item, length: Length) -> Self {
         Self { item, length }
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'encoded, 'decoded, 'length, Item, Length> crate::Decoder<'encoded, 'decoded>
     for VecCodec<Item, Length>
 where
@@ -43,7 +48,7 @@ where
     Length::Decoded: TryInto<usize>,
     <Length::Decoded as TryInto<usize>>::Error: Into<crate::DecodeError>,
 {
-    type Decoded = StdVec<Item::Decoded>;
+    type Decoded = Vec<Item::Decoded>;
 
     fn decode(
         &self,
@@ -55,7 +60,7 @@ where
             .decode(encoded, offset)?
             .try_into()
             .map_err(Into::into)?;
-        let mut vec = StdVec::with_capacity(size);
+        let mut vec = Vec::with_capacity(size);
         for _ in 0..size {
             let item = self.item.decode(encoded, offset)?;
             vec.push(item);
@@ -64,6 +69,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<Item, Length> crate::Encoder for VecCodec<Item, Length>
 where
     Length: crate::Encoder,
@@ -72,7 +78,7 @@ where
     Item: crate::Encoder,
     Item::Decoded: Sized,
 {
-    type Decoded = StdVec<Item::Decoded>;
+    type Decoded = Vec<Item::Decoded>;
 
     fn encode(
         &self,
@@ -90,6 +96,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<Item, Length> crate::Measurer for VecCodec<Item, Length>
 where
     Length: crate::Measurer,
@@ -98,7 +105,7 @@ where
     Item: crate::Measurer,
     Item::Decoded: Sized,
 {
-    type Decoded = StdVec<Item::Decoded>;
+    type Decoded = Vec<Item::Decoded>;
 
     fn measure(&self, decoded: &Self::Decoded) -> Result<usize, crate::error::EncodeError> {
         let size = decoded.len();
@@ -274,6 +281,7 @@ impl<T> UVarBECodec<T> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<T: BitStream> UVarBECodec<T> {
     fn try_into_septets_le(num: &T) -> Result<Vec<u8>, crate::error::EncodeError> {
         let septets = T::BITS / 7usize + if T::BITS % 7usize == 0 { 0 } else { 1 };
@@ -318,6 +326,7 @@ impl<T: BitStream> UVarBECodec<T> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<T: BitStream> crate::Encoder for UVarBECodec<T> {
     type Decoded = T;
     fn encode(
@@ -347,6 +356,7 @@ impl<T: BitStream> crate::Encoder for UVarBECodec<T> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<T: BitStream> crate::Measurer for UVarBECodec<T> {
     type Decoded = T;
     fn measure(&self, decoded: &T) -> Result<usize, crate::error::EncodeError> {
@@ -361,6 +371,7 @@ impl<T: BitStream> crate::Measurer for UVarBECodec<T> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'encoded, 'decoded, T: BitStream + 'decoded> crate::Decoder<'encoded, 'decoded>
     for UVarBECodec<T>
 {
@@ -554,7 +565,7 @@ impl<'encoded, 'decoded, Item> crate::Decoder<'encoded, 'decoded> for OptionCode
 where
     Item: crate::Decoder<'encoded, 'decoded>,
 {
-    type Decoded = StdOption<Item::Decoded>;
+    type Decoded = Option<Item::Decoded>;
 
     fn decode(
         &self,
@@ -563,10 +574,10 @@ where
     ) -> Result<Self::Decoded, crate::error::DecodeError> {
         let flag = BoolCodec.decode(encoded, offset)?;
         if flag {
-            Ok(StdOption::None)
+            Ok(Option::None)
         } else {
             let item = self.0.decode(encoded, offset)?;
-            Ok(StdOption::Some(item))
+            Ok(Option::Some(item))
         }
     }
 }
@@ -576,7 +587,7 @@ where
     Item: crate::Encoder,
     Item::Decoded: Sized,
 {
-    type Decoded = StdOption<Item::Decoded>;
+    type Decoded = Option<Item::Decoded>;
 
     fn encode(
         &self,
@@ -585,11 +596,11 @@ where
         offset: &mut usize,
     ) -> Result<(), crate::error::EncodeError> {
         match decoded {
-            StdOption::None => {
+            Option::None => {
                 BoolCodec.encode(&true, encoded, offset)?;
                 Ok(())
             }
-            StdOption::Some(item) => {
+            Option::Some(item) => {
                 BoolCodec.encode(&false, encoded, offset)?;
                 self.0.encode(item, encoded, offset)
             }
@@ -602,12 +613,12 @@ where
     Item: crate::Measurer,
     Item::Decoded: Sized,
 {
-    type Decoded = StdOption<Item::Decoded>;
+    type Decoded = Option<Item::Decoded>;
 
     fn measure(&self, decoded: &Self::Decoded) -> Result<usize, crate::error::EncodeError> {
         Ok(match decoded {
-            StdOption::None => BoolCodec.measure(&true)?,
-            StdOption::Some(item) => BoolCodec.measure(&false)? + self.0.measure(item)?,
+            Option::None => BoolCodec.measure(&true)?,
+            Option::Some(item) => BoolCodec.measure(&false)? + self.0.measure(item)?,
         })
     }
 }

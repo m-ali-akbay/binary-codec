@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use core::marker::PhantomData;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Endianness {
