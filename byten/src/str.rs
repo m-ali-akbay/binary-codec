@@ -188,3 +188,82 @@ impl crate::Measurer for CStrCodec {
         Ok(decoded.to_bytes_with_nul().len())
     }
 }
+
+/// A codec for heapless C-style null-terminated strings.
+////
+/// # Examples
+/// ```rust
+/// use byten::{HeaplessCStringCodec, Encoder, Decoder, Measurer, EncoderToVec as _};
+///
+/// let s: heapless::CString<32> = heapless::CString::from_bytes_with_nul(b"Hello, world!\0").unwrap();
+/// let codec = HeaplessCStringCodec::<32>::new();
+///
+/// let encoded = codec.encode_to_heapless_vec::<32>(&s).unwrap();
+/// assert_eq!(encoded.as_slice(), b"Hello, world!\0");
+///
+/// let mut decode_offset = 0;
+/// let decoded: heapless::CString<32> = codec.decode(&encoded, &mut decode_offset).unwrap();
+/// assert_eq!(decoded, s);
+/// assert_eq!(decode_offset, encoded.len());
+///
+/// let size = codec.measure(&s).unwrap();
+/// assert_eq!(size, encoded.len());
+/// ```
+pub struct HeaplessCStringCodec<const N: usize>;
+
+impl<const N: usize> HeaplessCStringCodec<N> {
+    pub const fn new() -> Self {
+        Self
+    }
+}
+
+impl<'encoded, 'decoded, const N: usize> crate::Decoder<'encoded, 'decoded>
+    for HeaplessCStringCodec<N>
+where
+    'encoded: 'decoded,
+{
+    type Decoded = heapless::CString<N>;
+
+    fn decode(
+        &self,
+        encoded: &'encoded [u8],
+        offset: &mut usize,
+    ) -> Result<Self::Decoded, crate::error::DecodeError> {
+        let length = encoded[*offset..]
+            .iter()
+            .position(|&b| b == 0)
+            .ok_or(crate::error::DecodeError::InvalidData)?;
+        let cstr = heapless::CString::from_bytes_with_nul(&encoded[*offset..*offset + length + 1])
+            .map_err(|_| crate::error::DecodeError::InvalidData)?;
+        *offset += length + 1;
+        Ok(cstr)
+    }
+}
+
+impl<const N: usize> crate::Encoder for HeaplessCStringCodec<N> {
+    type Decoded = heapless::CString<N>;
+
+    fn encode(
+        &self,
+        decoded: &Self::Decoded,
+        encoded: &mut [u8],
+        offset: &mut usize,
+    ) -> Result<(), crate::error::EncodeError> {
+        let bytes = decoded.as_bytes_with_nul();
+        let end = *offset + bytes.len();
+        if end > encoded.len() {
+            return Err(crate::error::EncodeError::BufferTooSmall);
+        }
+        encoded[*offset..end].copy_from_slice(bytes);
+        *offset = end;
+        Ok(())
+    }
+}
+
+impl<const N: usize> crate::Measurer for HeaplessCStringCodec<N> {
+    type Decoded = heapless::CString<N>;
+
+    fn measure(&self, decoded: &Self::Decoded) -> Result<usize, crate::error::EncodeError> {
+        Ok(decoded.as_bytes_with_nul().len())
+    }
+}

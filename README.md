@@ -117,7 +117,7 @@ use std::ffi::CString;
 pub struct Directory {
     #[byten(CStr $own)]
     pub name: CString,
-    #[byten(Entry box $vec[u16 $be])]
+    #[byten(Entry box for[u16 $be])]
     pub entries: Vec<Box<Entry>>,
 }
 
@@ -127,7 +127,7 @@ pub struct File {
     pub name: CString,
     #[byten($bytes[u16 $be] $own)]
     pub content: Vec<u8>,
-    #[byten(u32 $be $opt)]
+    #[byten(u32 $be ?)]
     pub assigned_application_id: Option<u32>,
 }
 
@@ -160,14 +160,15 @@ The `#[byten(...)]` attribute supports a flexible syntax for customizing encodin
 
 - **Endianness**: `$be` (big-endian), `$le` (little-endian)
 - **Variable-length**: `$uvarbe` (variable-length unsigned, big-endian)
-- **Collections**: `T $vec[Length]`, `T $arr`
+- **Collections**: `T for[Length]`, `T []`
 - **Bytes**: `$bytes[Length]` for raw byte slices
 - **Strings**: `$utf8` for UTF-8 strings, `CStr` for C strings
 - **Ownership**: `$own` to decode into owned data (e.g., `String`, `Vec`)
-- **Optional**: `$opt` for `Option<T>` types with presence byte
+- **Optional**: `?` for `Option<T>` types with presence byte
 - **Boxing**: `box` for `Box<T>` types
 - **Phantom**: `= expr` for constant values with zero bytes
 - **Remaining**: `..` to consume rest of input
+- **Tuples**: `(a, b, ...N)` as built-in codecs for N sized tuples
 - **Custom**: `{ expr }` for custom codec expressions
 
 ## Features Flags
@@ -236,6 +237,7 @@ The `byten/examples` directory contains several complete examples:
 - **`borrowed.rs`**: Zero-copy decoding with borrowed data and lifetimes
 - **`archive.rs`**: Recursive structures (file system directory tree)
 - **`icmp.rs`**: Network packet encoding (ICMP header)
+- **`nostd.rs`**: Simple FS structures for `no_std` environments
 - **`inline.rs`**: Using the inline `byten!()` macro for ad-hoc codecs
 
 Run examples with:
