@@ -33,7 +33,7 @@
 //! | [`OptionCodec`]       | `Option<T>` | `... ?`                                 | `Option<T>` using the provided codec for `T`                          |
 //! | [`BytesCodec`]        |             | `$bytes[len]`                           | byte slices with length prefixed by the provided codec                |
 //! | [`PhantomCodec`]      |             | `= expr`                                | phantom codec with 0 size, codes the given constant value             |
-//! | [`TupleNCodec`]       | `(a, ...N)` | `(a, ...N)`                             | tuple codecs for tuples of size N                                     |
+//! | `TupleNCodec`         | `(a, ...N)` | `(a, ...N)`                             | tuple codecs for tuples of size N                                     |
 //!
 //! # Usage in `no_std` Environments
 //!

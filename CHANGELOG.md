@@ -8,13 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `PrefixedCodec` - Generic codec for collections with length prefix
+- `HeaplessCStringCodec` - Codec for `heapless::CString<N>` types
+- Tuple codecs support up to 7 items (`Tuple1Codec` through `Tuple7Codec`)
+- `UnitCodec` (alias for `Tuple0Codec`) - Codec for unit/empty tuples
+- Tuple syntax support in derive macro: `(Item1, Item2, ...ItemN)` for encoding/decoding tuples
 - `no_std` support with new `std` and `alloc` feature flags
 - `encode_to_heapless_vec` in preludes as a helper for `no_std` environments
 
 ### Changed
+- **Breaking**: Replaced codec aliases in derive macro:
+  - `$vec` → `for` (e.g., `Item for[Length]`)
+  - `$arr` → `[]` (e.g., `Item []`)
+  - `$opt` → `?` (e.g., `Type ?`)
 - **Breaking**: Allocation-dependent codecs (`VecCodec`, `BoxCodec`, `UVarBECodec`, `OwnedCodec`) require the `alloc` feature
 - Error handling with `anyhow` requires the `std` feature
 - Default features now include `std`, `alloc`, `anyhow`, and `derive`
+
+### Removed
+- `VecCodec` - Replaced by `PrefixedCodec`
+- `HeaplessVecCodec` - Replaced by `PrefixedCodec`
 
 ## [0.0.12] - 2025-11-05
 
