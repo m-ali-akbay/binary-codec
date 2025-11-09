@@ -7,7 +7,7 @@ struct Person {
     #[byten( $bytes[u8] $utf8 $own )]
     name: String,
     birthday: Date,
-    #[byten( Color $vec[usize $uvarbe] )]
+    #[byten( Color for[usize $uvarbe] )]
     favorite_colors: Vec<Color>,
 }
 

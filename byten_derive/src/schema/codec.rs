@@ -5,7 +5,7 @@ use syn::{
     parse::{ParseStream, Parser},
     parse_quote,
     spanned::Spanned,
-    token::{Brace, Paren},
+    token::{Brace, Bracket, Paren},
 };
 
 use super::{BinarySchema, DecodeContext, EncodeContext, MeasureContext};
@@ -109,24 +109,6 @@ impl Operand for EndianOperand {
                 parse_quote! { ::byten::EndianCodec::<#ty>::new(::byten::Endianness::Little) }
             }
         }
-    }
-}
-
-struct VecOperand {
-    span: Span,
-    item: Box<dyn Operand>,
-    length: Box<dyn Operand>,
-}
-
-impl Operand for VecOperand {
-    fn span(&self) -> Span {
-        self.span
-    }
-
-    fn codec(&self) -> Expr {
-        let item_codec = self.item.codec();
-        let length_codec = self.length.codec();
-        parse_quote! { ::byten::VecCodec::new(#item_codec, #length_codec) }
     }
 }
 
@@ -286,6 +268,41 @@ impl Operand for BoxOperand {
     }
 }
 
+struct ForOperand {
+    span: Span,
+    item: Box<dyn Operand>,
+    length: Box<dyn Operand>,
+}
+
+impl Operand for ForOperand {
+    fn span(&self) -> Span {
+        self.span
+    }
+
+    fn codec(&self) -> Expr {
+        let item_codec = self.item.codec();
+        let length_codec = self.length.codec();
+        parse_quote! { ::byten::PrefixedCodec::new(#length_codec, #item_codec) }
+    }
+}
+
+struct TupleOperand {
+    span: Span,
+    items: Vec<Box<dyn Operand>>,
+}
+
+impl Operand for TupleOperand {
+    fn span(&self) -> Span {
+        self.span
+    }
+
+    fn codec(&self) -> Expr {
+        let item_codecs: Vec<Expr> = self.items.iter().map(|item| item.codec()).collect();
+        let codec_name = Ident::new(&format!("Tuple{}Codec", item_codecs.len()), self.span);
+        parse_quote! { ::byten::#codec_name::new( #( #item_codecs ),* ) }
+    }
+}
+
 pub fn build_codec_expr(tokens: TokenStream) -> syn::Result<Expr> {
     let span = tokens.span();
     let operand = Parser::parse2(
@@ -344,7 +361,7 @@ fn build_codec_pipeline(
 ) -> Result<Box<dyn Operand>, syn::Error> {
     loop {
         operand = build_codec(stream, operand)?;
-        if stream.is_empty() {
+        if stream.is_empty() || stream.peek(Token![,]) {
             break Ok(operand);
         }
     }
@@ -357,7 +374,23 @@ fn build_codec(
     if stream.peek(Paren) {
         let content;
         syn::parenthesized!(content in stream);
-        return build_codec_pipeline(&content, operand);
+        let operands = content.parse_terminated(
+            |s: ParseStream<'_>| {
+                build_codec_pipeline(s, Box::new(DefaultOperand { span: s.span() }))
+            },
+            Token![,],
+        )?;
+        if operands.len() == 1 && !operands.trailing_punct() {
+            return Err(syn::Error::new(
+                content.span(),
+                "Single element tuples require a trailing comma.",
+            ));
+        }
+        let items: Vec<Box<dyn Operand>> = operands.into_iter().collect();
+        return Ok(Box::new(TupleOperand {
+            span: content.span(),
+            items,
+        }));
     }
 
     if stream.peek(Brace) {
@@ -367,6 +400,21 @@ fn build_codec(
         return Ok(Box::new(CodecOperand {
             span: content.span(),
             codec: expr,
+        }));
+    }
+
+    if stream.peek(Bracket) {
+        let content;
+        syn::bracketed!(content in stream);
+        if !content.is_empty() {
+            return Err(syn::Error::new(
+                content.span(),
+                "Array codec does not support length specification here. Consider using 'for' modifier.",
+            ));
+        }
+        return Ok(Box::new(ArrOperand {
+            span: content.span(),
+            item: operand,
         }));
     }
 
@@ -389,6 +437,31 @@ fn build_codec(
         return Ok(Box::new(BoxOperand {
             span: box_token.span(),
             base: operand,
+        }));
+    }
+
+    if stream.peek(Token![?]) {
+        let opt_token: Token![?] = stream.parse()?;
+        return Ok(Box::new(OptOperand {
+            span: opt_token.span(),
+            base: operand,
+        }));
+    }
+
+    if stream.peek(Token![for]) {
+        let for_token: Token![for] = stream.parse()?;
+        let content;
+        syn::bracketed!(content in stream);
+        let length = build_codec_pipeline(
+            &content,
+            Box::new(DefaultOperand {
+                span: for_token.span(),
+            }),
+        )?;
+        return Ok(Box::new(ForOperand {
+            span: for_token.span(),
+            item: operand,
+            length,
         }));
     }
 
@@ -421,28 +494,6 @@ fn build_codec(
                     length,
                 }))
             }
-            "vec" => {
-                let content;
-                syn::bracketed!(content in stream);
-                let length = build_codec_pipeline(
-                    &content,
-                    Box::new(DefaultOperand { span: ident.span() }),
-                )?;
-
-                Ok(Box::new(VecOperand {
-                    span: ident.span(),
-                    item: operand,
-                    length,
-                }))
-            }
-            "arr" => Ok(Box::new(ArrOperand {
-                span: ident.span(),
-                item: operand,
-            })),
-            "opt" => Ok(Box::new(OptOperand {
-                span: ident.span(),
-                base: operand,
-            })),
             "utf8" => Ok(Box::new(UTF8Operand {
                 span: ident.span(),
                 base: operand,

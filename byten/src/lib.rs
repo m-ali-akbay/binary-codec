@@ -21,19 +21,19 @@
 //! | [`U8ArrayRefCodec`]   | `&[u8; N]`  | `&[u8; N]`                              |  references to fixed-size arrays of `u8` of size `N`                  |
 //! | [`BoolCodec`]         | `bool`      | `bool`                                  | `bool` type                                                           |
 //! | [`BoxCodec`]          | `Box<T>`    | `Box<T>` or `... box`                   | `Box<T>` where `t_codec` is the codec for `T`                         |
-//! | [`ArrayCodec`]        |             | `... $arr`                              | fixed-size arrays, `[Item; N]`                                        |
+//! | [`ArrayCodec`]        |             | `... []`                                | fixed-size arrays, `[Item; N]`                                        |
 //! | [`EndianCodec`]       |             | `... $be` or `... $le`                  | primitive types with little/big endian byte orders                    |
 //! | [`SelfCoded`]         |             | `{SelfCoded::<T>::new()}`               | derived type `T`                                                      |
 //! | [`UTF8Codec`]         |             | `$utf8`                                 | `&str` type using the provided bytes codec                            |
 //! | [`CStrCodec`]         | `CStr`      | `CStr` or `&CStr`                       | C-style strings (`CStr` and `&CStr`)                                  |
 //! | [`OwnedCodec`]        |             | `... $own`                              | owned data by cloning from borrowed data                              |
-//! | [`VecCodec`]          |             | `... $vec[len]`                         | `Vec<Item>` using the provided item and length codecs                 |
-//! | [`HeaplessVecCodec`]  |             | `{HeaplessVecCodec::new(len, item)}`    | `heapless::Vec<Item, N>` using the provided item and length codecs    |
+//! | [`PrefixedCodec`]     |             | `... for[len]`                          | Collections of `Item`s using the provided item and length codecs      |
 //! | [`RemainingCodec`]    |             | `..`                                    | all remaining bytes in the input                                      |
 //! | [`UVarBECodec`]       |             | `... $uvarbe`                           | unsigned variable-length big-endian integers                          |
-//! | [`OptionCodec`]       | `Option<T>` | `... $opt`                              | `Option<T>` using the provided codec for `T`                          |
+//! | [`OptionCodec`]       | `Option<T>` | `... ?`                                 | `Option<T>` using the provided codec for `T`                          |
 //! | [`BytesCodec`]        |             | `$bytes[len]`                           | byte slices with length prefixed by the provided codec                |
 //! | [`PhantomCodec`]      |             | `= expr`                                | phantom codec with 0 size, codes the given constant value             |
+//! | [`TupleNCodec`]       | `(a, ...N)` | `(a, ...N)`                             | tuple codecs for tuples of size N                                     |
 //!
 //! # Usage in `no_std` Environments
 //!
@@ -59,11 +59,13 @@ extern crate alloc;
 
 mod array;
 mod asis;
+mod collection;
 mod endian;
 mod error;
 mod prelude;
 mod selfcoded;
 mod str;
+mod tuple;
 mod util;
 mod uvarbe;
 mod var;
@@ -80,6 +82,8 @@ pub use array::*;
 #[doc(inline)]
 pub use asis::*;
 #[doc(inline)]
+pub use collection::*;
+#[doc(inline)]
 pub use endian::*;
 #[doc(inline)]
 pub use error::*;
@@ -89,6 +93,8 @@ pub use prelude::*;
 pub use selfcoded::*;
 #[doc(inline)]
 pub use str::*;
+#[doc(inline)]
+pub use tuple::*;
 #[doc(inline)]
 pub use util::*;
 #[doc(inline)]
@@ -144,6 +150,7 @@ pub use var::*;
 /// ```
 pub trait Encoder {
     type Decoded: ?Sized;
+
     fn encode(
         &self,
         decoded: &Self::Decoded,
@@ -158,6 +165,7 @@ where
     Ref: Deref<Target = T>,
 {
     type Decoded = T::Decoded;
+
     fn encode(
         &self,
         decoded: &Self::Decoded,
@@ -470,3 +478,51 @@ where
         OptionCodec::new(T::default_codec())
     }
 }
+
+impl<const N: usize> DefaultCodec for heapless::CString<N> {
+    type Codec = HeaplessCStringCodec<N>;
+    fn default_codec() -> Self::Codec {
+        HeaplessCStringCodec::new()
+    }
+}
+
+impl DefaultCodec for () {
+    type Codec = UnitCodec;
+    fn default_codec() -> Self::Codec {
+        UnitCodec
+    }
+}
+
+macro_rules! tuple_selfcoded {
+    ($name:ident, ($($idx:tt),*), ($($types:ident),*)) => {
+        impl<'decoded, $($types),*> DefaultCodec for ($(&'decoded $types),*,)
+        where
+            $($types: DefaultCodec,)*
+        {
+            type Codec = $name<$($types::Codec),*>;
+            fn default_codec() -> Self::Codec {
+                $name( $($types::default_codec()),* )
+            }
+        }
+    };
+}
+
+tuple_selfcoded!(Tuple1Codec, (0), (Type1));
+tuple_selfcoded!(Tuple2Codec, (0, 1), (Type1, Type2));
+tuple_selfcoded!(Tuple3Codec, (0, 1, 2), (Type1, Type2, Type3));
+tuple_selfcoded!(Tuple4Codec, (0, 1, 2, 3), (Type1, Type2, Type3, Type4));
+tuple_selfcoded!(
+    Tuple5Codec,
+    (0, 1, 2, 3, 4),
+    (Type1, Type2, Type3, Type4, Type5)
+);
+tuple_selfcoded!(
+    Tuple6Codec,
+    (0, 1, 2, 3, 4, 5),
+    (Type1, Type2, Type3, Type4, Type5, Type6)
+);
+tuple_selfcoded!(
+    Tuple7Codec,
+    (0, 1, 2, 3, 4, 5, 6),
+    (Codec1, Codec2, Codec3, Codec4, Codec5, Codec6, Codec7)
+);
